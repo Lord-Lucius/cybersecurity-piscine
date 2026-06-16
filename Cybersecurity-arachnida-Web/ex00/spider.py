@@ -11,6 +11,25 @@ DEBUG_FLAG = True
 
 
 def handle_options():
+    """
+    Parse command-line arguments for the spider program.
+
+    Expected usage: ./spider [-rlp] URL
+
+    Options:
+        -r        : enable recursive download of images.
+        -l [N]    : maximum recursion depth (default 5, requires -r).
+        -p [PATH] : directory where images are saved (default ./data/).
+
+    Returns:
+        tuple: (recursive_flag, depth_len, save_path, url_to_scrap)
+
+    Raises:
+        AssertionError: if arguments are missing, malformed, or invalid
+                        (no URL, -l without -r, invalid depth, bad path,
+                        unknown option, or URL not starting with http(s)).
+    """
+
     recursive_flag = False
     depth_len = 5
     save_path = "./data/"
@@ -51,6 +70,17 @@ def handle_options():
 
 
 def get_page_images(html_body):
+    """
+    Extract all image sources from an HTML document.
+
+    Args:
+        html_body (str): raw HTML content of a page.
+
+    Returns:
+        set[str]: set of unique 'src' values from all <img> tags
+                  (may contain relative URLs).
+    """
+
     soup = BeautifulSoup(html_body, "html.parser")
     images_raw = soup.find_all("img")
     img_set = set()
@@ -59,6 +89,17 @@ def get_page_images(html_body):
 
 
 def get_page_links(html_body):
+    """
+    Extract all hyperlink targets from an HTML document.
+
+    Args:
+        html_body (str): raw HTML content of a page.
+
+    Returns:
+        set[str]: set of unique 'href' values from all <a> tags
+                  (may contain relative URLs).
+    """
+
     soup = BeautifulSoup(html_body, "html.parser")
     links = soup.find_all("a")
     links_set = set()
@@ -67,6 +108,23 @@ def get_page_links(html_body):
 
 
 def save_image(images_set, save_path, base_url):
+    """
+    Download and save images with an authorized extension.
+
+    Relative image URLs are resolved against base_url. Each file is
+    named with an 8-char hash prefix (to avoid collisions) followed by
+    a truncated original name and its extension. Failed downloads are
+    skipped silently.
+
+    Args:
+        images_set (set[str]): image URLs (relative or absolute).
+        save_path (str): destination directory (created if missing).
+        base_url (str): URL of the page the images were found on.
+
+    Returns:
+        None
+    """
+
     os.makedirs(save_path, exist_ok=True)
     authorized_extension = ["jpg", "jpeg", "png", "gif", "bmp"]
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -86,6 +144,27 @@ def save_image(images_set, save_path, base_url):
 
 
 def scrape_page(url, save_path, current_depth, max_depth, visited, base_domain):
+    """
+    Recursively crawl a page, download its images and follow its links.
+
+    Stops when the maximum depth is exceeded or the URL was already
+    visited. Only follows links that stay on the same domain as the
+    starting URL. URL fragments (#...) are stripped to avoid revisiting
+    the same page.
+
+    Args:
+        url (str): URL of the page to scrape.
+        save_path (str): destination directory for images.
+        current_depth (int): current recursion depth.
+        max_depth (int): maximum allowed recursion depth.
+        visited (set[str]): URLs already processed (mutated in place).
+        base_domain (str): netloc of the starting URL, used to stay
+                           within the same domain.
+
+    Returns:
+        None
+    """
+
     if current_depth > max_depth:
         return
     if url in visited:
@@ -114,6 +193,17 @@ def scrape_page(url, save_path, current_depth, max_depth, visited, base_domain):
 
 
 def main():
+    """
+    Entry point. Parse options, then start the crawl from the given URL.
+
+    Runs a single-page scrape when -r is absent, or a recursive crawl
+    otherwise. Catches and reports argument, connection, recursion and
+    keyboard-interrupt errors cleanly.
+
+    Returns:
+        None
+    """
+
     try:
         recursif_mod, depth_len, save_path, url_to_scrap = handle_options()
         base_domain = urlparse(url_to_scrap).netloc

@@ -214,9 +214,9 @@ def main():
     except AssertionError as e:
         print(f"AssertionError: {e}")
     except (requests.exceptions.ConnectionError, ConnectionRefusedError) as e:
-        print(f"requests error ({e})")
+        print(f"requests error: {e}")
     except RecursionError as e:
-        print(f"too much recursion ({e})")
+        print(f"recursion error: {e}")
     except KeyboardInterrupt:
         print("\nInterrupted by user")
 

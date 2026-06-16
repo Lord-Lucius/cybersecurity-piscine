@@ -1,6 +1,9 @@
 import sys
 
 
+def check_filepath():
+    pass
+
 def handle_arguments():
     args_list = sys.argv
     if len(args_list) < 2:

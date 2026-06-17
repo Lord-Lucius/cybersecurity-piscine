@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 20:27:42 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/17 21:18:27 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/17 23:34:08 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,7 +23,8 @@ typedef struct params_s {
 	char *filename;
 } params_t;
 
-int parse_option(char **av);
+void parse_option(params_t *params, char **av);
+void check_key(params_t params);
 
 /* UTILS */
 void error(char *msg);

@@ -135,7 +135,10 @@ def save_image(images_set, save_path, base_url):
                 name, ext = os.path.splitext(os.path.basename(urlparse(image).path))
                 short_hash = hashlib.md5(image.encode()).hexdigest()[:8]
                 filename = short_hash + "_" + name[:50] + ext
-                img_data = requests.get(image, timeout=(5, 5), headers=headers).content
+                response = requests.get(image, timeout=(5, 5), headers=headers)
+                if not response.headers.get("Content-Type", "").startswith("image/"):
+                    continue
+                img_data = response.content
                 final_path = os.path.join(save_path, filename)
                 with open(final_path, "wb") as handler:
                     handler.write(img_data)

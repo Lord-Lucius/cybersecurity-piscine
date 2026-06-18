@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 20:45:02 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/17 23:56:17 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/18 15:17:40 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 #include "ft_otp.h"
 

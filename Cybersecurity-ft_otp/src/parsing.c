@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 20:27:18 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/18 17:04:45 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/18 19:37:24 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,8 @@ static char *concat(const char *s1, const char *s2) {
 	char *result = malloc(len1 + len2 + 1);
 
 	if (!result) error("malloc failed in concat");
-	if (len1 > 0) memcpy(result, s1, len1);
+	if (len1 > 0) memcpy(result, s1, len1 + 1);
+	result[len1 + 1] = '\0'; // no impact just to disable warning
 	memcpy(result + len1, s2, len2 + 1);
 	return result;
 }

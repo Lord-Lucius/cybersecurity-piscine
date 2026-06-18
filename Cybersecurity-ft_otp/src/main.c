@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 19:54:58 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/18 17:05:17 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/18 23:03:53 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,8 +24,15 @@ int main(int ac, char **av) {
 	if (params.g_flag)
 		check_key(&params);
 
-	printf("All went good finishing the program\nkey: %s\nsize: %ld", params.key, params.key_size);
+	decode_hex(&params);
+	if (DEBUG_FLAG)
+		debug_hexdump("key", params.decoded_key, params.decoded_key_size);
+
+	encode_counter(&params);
+	if (DEBUG_FLAG)
+		debug_hexdump("counter", params.counter, 8);
 
 	free(params.key);
+	free(params.decoded_key);
 	return (0);
 }

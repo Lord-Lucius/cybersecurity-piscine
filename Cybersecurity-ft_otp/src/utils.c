@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 20:45:02 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/18 15:17:40 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/18 22:58:47 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,4 +25,18 @@ void error(char *msg) {
 	(void)!write(2, final_msg, strlen(final_msg));
 	free(final_msg);
 	exit(1);
+}
+
+void debug_hexdump(const char *label, const void *data, size_t len)
+{
+	const unsigned char *bytes = data;
+
+	fprintf(stderr, "[DEBUG] %-12s (%zu octets): ", label, len);
+	for (size_t i = 0; i < len; i++)
+	{
+		fprintf(stderr, "%02x", bytes[i]);
+		if ((i + 1) % 4 == 0 && i + 1 < len)
+			fprintf(stderr, " ");
+	}
+	fprintf(stderr, "\n");
 }

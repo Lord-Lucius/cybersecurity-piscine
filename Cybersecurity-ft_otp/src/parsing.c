@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 20:27:18 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/18 19:37:24 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/18 21:52:53 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,6 +83,7 @@ void check_key(params_t *params) {
 	params->key = (char *)malloc(count_char * sizeof(char));
 	memcpy(params->key, rebuild_str, count_char);
 	params->key_size = count_char;
+	params->decoded_key_size = count_char / 2;
 
 	free(rebuild_str);
 }

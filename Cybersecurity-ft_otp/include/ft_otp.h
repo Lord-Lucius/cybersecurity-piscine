@@ -6,14 +6,14 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/17 20:27:42 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/06/19 07:42:27 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/06/19 20:08:33 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef FT_OTP_H
 #define FT_OTP_H
 
-#define DEBUG_FLAG 1
+#define DEBUG_FLAG 0
 
 #include <stddef.h>
 
@@ -21,7 +21,7 @@ typedef struct params_s {
 	int g_flag;
 	int k_flag;
 	char *filename;
-	char *key;					// malloc
+	unsigned char *key;					// malloc
 	unsigned char *decoded_key; // malloc
 	unsigned char message[8];
 	unsigned char hmac[20];

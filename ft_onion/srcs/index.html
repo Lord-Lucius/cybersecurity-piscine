@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>::onion::</title>
+
+		<!--
+		ft_onion · page statique servie par Nginx derrière un hidden service Tor.
+		Tout est inline (zéro asset externe) pour rester propre à servir.
+		Le contenu est libre : change le texte du <h1> et des lignes .line ci-dessous.
+		-->
+
+		<style>
+		:root {
+			/* Palette ancrée sur Tor (le violet de marque) plutôt que le vert "matrix" cliché */
+			--void:    #07060b;
+			--void-2:  #0c0a15;
+			--onion:   #9b6cff;   /* violet Tor, accent principal */
+			--onion-d: #5b3fa6;
+			--signal:  #3ef0c0;   /* vert terminal, réservé aux états "ok" */
+			--ash:     #6a6480;   /* texte secondaire, éteint */
+			--bone:    #e9e6f5;   /* texte vif */
+			--alert:   #ff5470;
+		}
+
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+
+		html, body { height: 100%; }
+
+		body {
+			background: radial-gradient(120% 120% at 50% 0%, var(--void-2) 0%, var(--void) 70%);
+			color: var(--ash);
+			font-family: "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
+			font-size: 15px;
+			line-height: 1.65;
+			overflow: hidden;
+			-webkit-font-smoothing: antialiased;
+		}
+
+		/* pluie de caractères, très éteinte, en arrière-plan */
+		#rain {
+			position: fixed; inset: 0;
+			z-index: 0;
+			opacity: 0.16;
+		}
+
+		/* fines scanlines CRT */
+		body::after {
+			content: "";
+			position: fixed; inset: 0;
+			z-index: 1;
+			pointer-events: none;
+			background: repeating-linear-gradient(
+			to bottom,
+			rgba(0,0,0,0) 0px,
+			rgba(0,0,0,0) 2px,
+			rgba(0,0,0,0.18) 3px,
+			rgba(0,0,0,0) 4px
+			);
+			mix-blend-mode: multiply;
+		}
+
+		.stage {
+			position: relative;
+			z-index: 2;
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 24px;
+			text-align: center;
+		}
+
+		/* ── signature : l'onion en couches concentriques ─────────────── */
+		.onion-mark {
+			position: relative;
+			width: 88px; height: 88px;
+			margin-bottom: 34px;
+		}
+		.onion-mark span {
+			position: absolute; inset: 0;
+			margin: auto;
+			border: 1px solid var(--onion-d);
+			border-radius: 50%;
+			animation: pulse 3.4s ease-in-out infinite;
+		}
+		.onion-mark span:nth-child(1){ width: 88px; height: 88px; animation-delay: 0s;    border-color: var(--onion); }
+		.onion-mark span:nth-child(2){ width: 64px; height: 64px; animation-delay: .25s; }
+		.onion-mark span:nth-child(3){ width: 40px; height: 40px; animation-delay: .5s; }
+		.onion-mark span:nth-child(4){
+			width: 8px; height: 8px;
+			border: none; border-radius: 50%;
+			background: var(--signal);
+			box-shadow: 0 0 14px var(--signal);
+			animation: core 3.4s ease-in-out infinite;
+		}
+		@keyframes pulse { 0%,100%{ opacity:.25; transform:scale(.92);} 50%{ opacity:.9; transform:scale(1);} }
+		@keyframes core  { 0%,100%{ opacity:.5;} 50%{ opacity:1;} }
+
+		/* ── boot log : handshake d'un circuit Tor qui se tape ────────── */
+		.boot {
+			width: min(560px, 100%);
+			text-align: left;
+			margin-bottom: 36px;
+			min-height: 132px;
+		}
+		.line { white-space: pre-wrap; }
+		.line .tag   { color: var(--onion); }
+		.line .ok    { color: var(--signal); }
+		.line .dim   { color: var(--ash); }
+		.line .node  { color: var(--bone); }
+
+		/* ── titre glitch ─────────────────────────────────────────────── */
+		.title {
+			position: relative;
+			color: var(--bone);
+			font-size: clamp(2.4rem, 9vw, 4.4rem);
+			font-weight: 700;
+			letter-spacing: .14em;
+			line-height: 1;
+		}
+		.title[data-text]::before,
+		.title[data-text]::after {
+			content: attr(data-text);
+			position: absolute; left: 0; top: 0;
+			width: 100%;
+			overflow: hidden;
+		}
+		.title[data-text]::before { color: var(--onion); animation: glitch-a 2.7s infinite steps(2); }
+		.title[data-text]::after  { color: var(--signal); animation: glitch-b 3.3s infinite steps(2); }
+		@keyframes glitch-a {
+			0%,92%,100% { clip-path: inset(0 0 100% 0); transform: translate(0); }
+			93% { clip-path: inset(8% 0 78% 0);  transform: translate(-3px,-1px); }
+			96% { clip-path: inset(54% 0 32% 0); transform: translate(2px,1px); }
+		}
+		@keyframes glitch-b {
+			0%,90%,100% { clip-path: inset(100% 0 0 0); transform: translate(0); }
+			91% { clip-path: inset(70% 0 12% 0); transform: translate(3px,1px); }
+			94% { clip-path: inset(24% 0 60% 0); transform: translate(-2px,-1px); }
+		}
+
+		.sub {
+			margin-top: 18px;
+			color: var(--ash);
+			font-size: .82rem;
+			letter-spacing: .35em;
+			text-transform: uppercase;
+		}
+
+		/* ── prompt clignotant ────────────────────────────────────────── */
+		.prompt {
+			position: fixed;
+			z-index: 2;
+			left: 50%; bottom: 30px;
+			transform: translateX(-50%);
+			color: var(--ash);
+			font-size: .82rem;
+			letter-spacing: .05em;
+		}
+		.prompt .arrow { color: var(--onion); }
+		.caret {
+			display: inline-block;
+			width: 8px; height: 1.05em;
+			background: var(--signal);
+			vertical-align: -2px;
+			margin-left: 3px;
+			animation: blink 1.05s step-end infinite;
+		}
+		@keyframes blink { 50% { opacity: 0; } }
+
+		:focus-visible { outline: 2px solid var(--onion); outline-offset: 3px; }
+
+		@media (prefers-reduced-motion: reduce) {
+			.onion-mark span, .title::before, .title::after, .caret { animation: none; }
+			#rain { display: none; }
+		}
+		</style>
+	</head>
+	<body>
+
+		<canvas id="rain" aria-hidden="true"></canvas>
+
+		<main class="stage">
+			<div class="onion-mark" aria-hidden="true">
+			<span></span><span></span><span></span><span></span>
+			</div>
+
+			<section class="boot" id="boot" aria-label="connection log"></section>
+
+			<!-- ← change ce mot pour ce que tu veux -->
+			<h1 class="title" data-text="NO_EXIT">NO_EXIT</h1>
+			<p class="sub">you are nowhere</p>
+		</main>
+
+		<div class="prompt"><span class="arrow">guest@hidden</span>:~$<span class="caret"></span></div>
+
+		<script>
+		(() => {
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+		/* ── 1. handshake qui se tape ligne par ligne ─────────────────── */
+		const boot = document.getElementById('boot');
+		const lines = [
+			'<span class="tag">tor</span> establishing circuit . . .',
+			'      <span class="node">[guard]</span> ── <span class="node">[relay]</span> ── <span class="node">[rendezvous]</span>   <span class="ok">ok</span>',
+			'<span class="tag">tor</span> onion service descriptor published',
+			'<span class="tag">tor</span> introduction points ready  <span class="dim">(3)</span>',
+			'<span class="ok">»</span> handshake complete · <span class="dim">no exit node · no logs</span>',
+		];
+
+		function typeLine(html, el, done) {
+			// tape le texte visible tout en gardant les balises intactes
+			const tmp = document.createElement('div'); tmp.innerHTML = html;
+			const full = tmp.textContent;
+			let i = 0;
+			const tick = () => {
+			// reconstruit progressivement en respectant le HTML
+			let shown = '', count = i, walk = html;
+			// approche simple : on révèle le texte brut, le HTML final est posé à la fin
+			el.textContent = full.slice(0, i);
+			i++;
+			if (i <= full.length) setTimeout(tick, 14 + Math.random() * 26);
+			else { el.innerHTML = html; done && done(); }
+			};
+			tick();
+		}
+
+		let idx = 0;
+		function next() {
+			if (idx >= lines.length) return;
+			const el = document.createElement('div');
+			el.className = 'line';
+			boot.appendChild(el);
+			if (reduce) { el.innerHTML = lines[idx]; idx++; next(); return; }
+			typeLine(lines[idx], el, () => { idx++; setTimeout(next, 180); });
+		}
+		next();
+
+		/* ── 2. pluie de caractères, dim, en violet/vert ──────────────── */
+		if (!reduce) {
+			const c = document.getElementById('rain');
+			const ctx = c.getContext('2d');
+			const glyphs = 'アカサタナ01░▒▓◢◣╱╲<>/\\|=+*'.split('');
+			let cols, drops, fontSize = 14;
+
+			function resize() {
+			c.width = innerWidth; c.height = innerHeight;
+			cols = Math.floor(c.width / fontSize);
+			drops = Array(cols).fill(0).map(() => Math.random() * -50);
+			}
+			resize();
+			addEventListener('resize', resize);
+
+			function draw() {
+			ctx.fillStyle = 'rgba(7,6,11,0.10)';
+			ctx.fillRect(0, 0, c.width, c.height);
+			ctx.font = fontSize + 'px monospace';
+			for (let i = 0; i < cols; i++) {
+				const g = glyphs[(Math.random() * glyphs.length) | 0];
+				ctx.fillStyle = Math.random() > 0.86 ? '#3ef0c0' : '#9b6cff';
+				ctx.fillText(g, i * fontSize, drops[i] * fontSize);
+				if (drops[i] * fontSize > c.height && Math.random() > 0.975) drops[i] = 0;
+				drops[i] += 0.5;
+			}
+			requestAnimationFrame(draw);
+			}
+			draw();
+		}
+		})();
+		</script>
+	</body>
+</html>

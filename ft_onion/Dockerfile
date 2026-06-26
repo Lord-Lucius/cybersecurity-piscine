@@ -8,5 +8,8 @@ RUN apt-get update && apt-get upgrade -y && \
 
 COPY ./srcs/nginx.conf /etc/nginx/nginx.conf
 COPY ./srcs/index.html /var/www/html/index.html
+COPY ./srcs/sshd_config /etc/ssh/sshd_config
+
+RUN mkdir -p /run/sshd
 
 CMD ["sleep", "infinity"]

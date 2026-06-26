@@ -1,0 +1,9 @@
+services:
+  ft_onion:
+    build: .
+    container_name: onion
+    volumes:
+      - onion_keys:/var/lib/tor/hidden_service
+
+volumes:
+  onion_keys:

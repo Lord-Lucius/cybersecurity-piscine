@@ -20,7 +20,8 @@ COPY ./tools/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 RUN useradd -m -s /bin/bash ghost
-RUN chmod 755 /home/ghost
+RUN passwd -d ghost
+RUN chmod 750 /home/ghost
 
 RUN mkdir -p /home/ghost/.ssh
 

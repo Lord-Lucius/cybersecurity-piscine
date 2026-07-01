@@ -14,6 +14,10 @@
 
 #include <string>
 
+#define NORMAL_MOD_CODE 1
+#define REVERSE_MOF_CODE 2
+#define SILENT_MOD_CODE 3
+
 class Parser {
 	private:
 		int option_code;

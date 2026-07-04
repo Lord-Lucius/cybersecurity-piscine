@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/30 09:06:17 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/02 22:15:57 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/04 10:56:08 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,7 +30,7 @@ class Parser {
 		static bool cmdOptionExists(char** begin, char** end, const std::string& option);
 
 	public:
-		Parser *parse(int ac, char **av);
+		void parse(int ac, char **av);
 		int getOptionfield(void) const;
 		std::string getKey(void) const;
 };

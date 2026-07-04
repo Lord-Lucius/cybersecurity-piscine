@@ -1,31 +1,26 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   main.cpp                                           :+:      :+:    :+:   */
+/*   Discovering.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/06/30 09:04:14 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/04 11:25:48 by luluzuri         ###   ########.fr       */
+/*   Created: 2026/07/04 11:08:53 by luluzuri          #+#    #+#             */
+/*   Updated: 2026/07/04 11:26:14 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <iostream>
-#include "Discovering.hpp"
-#include "Parser.hpp"
+#pragma once
 
-int main(int ac, char **av) {
-	if (ac < 2) {
-		std::cerr << "AssertionError: need atleast 1 argument and max 2 "
-					 "(option - key)."
-				  << std::endl;
-		exit(1);
-	}
-	std::cout << "Hello stockholm" << std::endl;
-	Parser p;
-	p.parse(ac, av);
-	std::cout << p.getKey() << " :: " << p.getOptionfield() << std::endl;
-	Discovering d;
-	d.discover();
-	return 0;
-}
+#include <iostream>
+
+class Discovering {
+	private:
+		const std::string home = "HOME";
+		const std::string infection_folder_name = "/infection";
+		char *getenv_result;
+		std::string complete_path;
+
+	public:
+		void discover();
+};

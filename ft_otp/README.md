@@ -50,7 +50,7 @@ ft_otp/
 ├── Makefile               # builds ft_otp, links libcrypto, cross-platform OpenSSL detection
 ├── include/
 │   └── ft_otp.h           # params_t struct + prototypes
-└── srcs/
+└── src/
     ├── main.c             # entry point: -g / -k dispatch
     ├── parsing.c          # argument parsing + key validation
     ├── storage.c          # encryption / decryption of ft_otp.key
@@ -70,7 +70,7 @@ ft_otp/
   - Debian/Ubuntu: `sudo apt install libssl-dev`
   - Fedora: `sudo dnf install openssl-devel`
   - macOS: `brew install openssl@3` *(the Makefile detects the Homebrew path)*
-- `oathtool` *(optional)* to cross-check generated codes
+- `oathtool` *(recommended)* to cross-check generated codes
 
 ---
 
@@ -149,16 +149,52 @@ ft_otp.key ─┬─► decryption (AES-256-CBC)
 
 ---
 
-## Verification
+## Testing it live
 
-The output matches the reference tool at the same instant:
+Every command below is reproducible. Because TOTP codes depend on the current
+time, don't expect a fixed number — the meaningful check is that **`ft_otp` and
+`oathtool` always print the same code at the same instant**.
+
+### Correctness against the reference tool
+
+Use a fixed example key so both tools work from the same secret:
 
 ```sh
+echo -n "3132333435363738393031323334353637383930313233343536373839303132" > key.hex
+./ft_otp -g key.hex
 oathtool --totp $(cat key.hex)
 ./ft_otp -k ft_otp.key
 ```
 
-Both print the same code, and both roll over together on each new 30-second step.
+The last two commands print an identical 6-digit code. Wait for a new 30-second
+window and they roll over together:
+
+```sh
+sleep 30
+oathtool --totp $(cat key.hex)
+./ft_otp -k ft_otp.key
+```
+
+### The key is stored encrypted
+
+```sh
+./ft_otp -g key.hex
+cat ft_otp.key          # unreadable binary — the hex key never appears
+```
+
+### Error handling (nothing should crash)
+
+| Command | Expected |
+|---|---|
+| `./ft_otp` | usage error, exit code ≠ 0 |
+| `./ft_otp -x key.hex` | unknown option error |
+| `./ft_otp -g missing.hex` | file-not-found error |
+| `echo -n "tooshort" > s.hex && ./ft_otp -g s.hex` | length error |
+| `echo -n "zzzz...(64 chars)" > bad.hex && ./ft_otp -g bad.hex` | non-hex error |
+| `./ft_otp -k missing.key` | file-not-found error |
+| `head -c 10 ft_otp.key > bad.key && ./ft_otp -k bad.key` | corrupted-file error |
+
+Each prints a clear `ERROR:` message and exits cleanly — no segfault.
 
 ---
 

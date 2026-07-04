@@ -222,3 +222,4 @@ data/
 *.hex
 *.txt
 tests.py
+stockholm

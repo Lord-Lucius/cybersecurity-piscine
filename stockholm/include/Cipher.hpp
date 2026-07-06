@@ -1,30 +1,22 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Discovering.hpp                                    :+:      :+:    :+:   */
+/*   Cipher.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/04 11:08:53 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/06 15:17:37 by luluzuri         ###   ########.fr       */
+/*   Created: 2026/07/06 15:14:58 by luluzuri          #+#    #+#             */
+/*   Updated: 2026/07/06 15:21:45 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
-#pragma once
 
 #include <filesystem>
 #include <iostream>
 #include <vector>
 
-class Discovering {
+class Cipher {
 	private:
-		const std::string home = "HOME";
-		const std::string infection_folder_name = "/infection";
-		char *getenv_result;
-		std::string complete_path;
-		std::vector<std::filesystem::directory_entry> final_paths_vector;
-
+		const std::string new_ext = ".ft";
 	public:
-		Discovering(int &option_field);
-		std::vector<std::filesystem::directory_entry> getFinalPaths(void);
+		Cipher(std::vector<std::filesystem::directory_entry> &final_paths_vector, std::string &key);
 };

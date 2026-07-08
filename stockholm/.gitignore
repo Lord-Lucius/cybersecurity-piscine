@@ -1,0 +1,11 @@
+# Build artifacts
+build/
+*.o
+*.d
+
+# Binary
+stockholm
+
+# Compilation database
+compile_commands.json
+.cache/

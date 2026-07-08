@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/04 11:08:53 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/06 15:17:37 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/08 12:58:46 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,6 +25,6 @@ class Discovering {
 		std::vector<std::filesystem::directory_entry> final_paths_vector;
 
 	public:
-		Discovering(int &option_field);
+		Discovering(const int &option_field);
 		std::vector<std::filesystem::directory_entry> getFinalPaths(void);
 };

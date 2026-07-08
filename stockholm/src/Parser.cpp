@@ -6,17 +6,9 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/30 09:23:38 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/06 12:03:10 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/08 13:12:14 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
-/*
-List of option accepted:
-	* --help / -h show help
-	* --version / -v show version
-	* --reverse / -r <key> inverse infection
-	* --silent / -s silent mod ( silence the print of the file being affected )
-*/
 
 #include <cstddef>
 #include <iostream>
@@ -54,11 +46,18 @@ Parser::Parser(int ac, char **av) {
 		}
 		this->key = raw;
 	} else {
-		if (av[1][0] == '-') {
+		char *found = nullptr;
+		for (int i = 1; i < ac; i++) {
+			if (av[i][0] != '-') {
+				found = av[i];
+				break;
+			}
+		}
+		if (found == nullptr) {
 			std::cerr << "Error: encryption key required" << std::endl;
 			exit(1);
 		}
-		this->key = av[1];
+		this->key = found;
 	}
 	if (this->key.length() < 16) {
 		std::cerr << "Error: key must be at least 16 characters" << std::endl;

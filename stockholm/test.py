@@ -54,6 +54,9 @@ WANNACRY_FILES = [
     # Media
     "media/song.mp3",
     "media/video.mp4",
+    # Text / data (WannaCry targets)
+    "data/export.txt",
+    "data/records.csv",
     # Nested subfolders
     "documents/legal/nda.doc",
     "documents/legal/terms.pdf",
@@ -64,10 +67,10 @@ WANNACRY_FILES = [
 # Non-WannaCry extensions — must NOT be touched
 IGNORED_FILES = [
     "readme.md",
-    "notes.txt",
     "debug.log",
     "config.ini",
-    "data.csv",
+    "project.toml",
+    "source.rs",
 ]
 
 GREEN  = "\033[92m"
@@ -104,6 +107,7 @@ def create_environment():
 
     for rel_path in IGNORED_FILES:
         target = INFECTION_DIR / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(f"Fake content for {target.name} — should be ignored\n")
         ok(f"Created {rel_path}  (non-targeted)")
 
@@ -339,8 +343,8 @@ def run_tests(key: str, binary: str):
     else:
         ok("stockholm --reverse exited 0")
 
-    dec_ok    = 0
-    dec_fail  = 0
+    dec_ok         = 0
+    dec_fail       = 0
     integrity_ok   = 0
     integrity_fail = 0
 
@@ -350,7 +354,6 @@ def run_tests(key: str, binary: str):
 
         if plain_path.exists() and not encrypted_path.exists():
             dec_ok += 1
-            # Content integrity check
             after_hash = hash_file(plain_path)
             if before_hashes.get(rel) == after_hash:
                 integrity_ok += 1
@@ -373,8 +376,6 @@ def run_tests(key: str, binary: str):
     wrong_key = "WRONGKEYABCDEFGH"
     r = run_stockholm(binary, ["--reverse", wrong_key])
     info(f"stockholm --reverse <wrong_key> exited {r.returncode}")
-    # We don't enforce a specific exit code here — just report behavior
-    # A well-implemented program should either fail or produce garbage output
 
     # ── 9. --silent ──────────────────────────────────────────
     header("9 / --silent mode")

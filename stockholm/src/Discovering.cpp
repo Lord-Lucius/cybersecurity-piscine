@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/04 11:12:53 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/06 15:17:41 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/08 13:05:22 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,7 @@
 
 namespace fs = std::filesystem;
 
-Discovering::Discovering(int &option_field) {
+Discovering::Discovering(const int &option_field) {
 	this->getenv_result = std::getenv(this->home.c_str());
 	if (this->getenv_result == nullptr) {
 		std::cout << "Error: getenv failed ( " << this->home << " not found )"

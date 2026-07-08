@@ -13,7 +13,7 @@ CXX         := c++
 CXXFLAGS    := -Wall -Wextra -Werror -std=c++17 -g3
 CPPFLAGS    := -Iinclude -MMD -MP
 LDFLAGS     :=
-LDLIBS      := # -lssl -lcrypto
+LDLIBS      := -lssl -lcrypto
 
 # Mode debug : `make DEBUG=1`
 ifeq ($(DEBUG),1)

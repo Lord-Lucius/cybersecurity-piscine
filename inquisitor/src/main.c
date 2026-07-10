@@ -6,11 +6,13 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:02:46 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/10 11:02:58 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/10 14:05:33 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <stdio.h>
+
+#include "inquisitor.h"
 
 int main(void) {
 	return 0;

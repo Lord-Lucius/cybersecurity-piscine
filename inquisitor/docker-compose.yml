@@ -6,12 +6,15 @@
 #    .2  server   (FTP)                                                        #
 #    .3  client   (victim)                                                     #
 #    .4  attacker (inquisitor)                                                 #
+#                                                                              #
+#  MAC plan: 02:42 (locally-administered prefix) + IPv4 in hex                 #
+#    .2 -> 02:42:c0:a8:00:02   .3 -> 02:42:c0:a8:00:03   .4 -> 02:42:c0:a8:00:04
+#  => deterministic MACs, passed as-is to inquisitor.                          #
 # ============================================================================ #
-
 services:
 
   # -------------------------------------------------------------------------- #
-  #  FTP server — prebuilt image                                               #
+  #  FTP server (vsftpd, plaintext on port 21) — the sniffing target           #
   # -------------------------------------------------------------------------- #
   server:
     container_name: server
@@ -20,6 +23,7 @@ services:
       - FTP_USER=test
       - FTP_PASS=1234
       - PUBLIC_IP=192.168.0.2
+      - UID=1000
     volumes:
       - ./data:/home/user
     networks:
@@ -29,7 +33,7 @@ services:
     restart: unless-stopped
 
   # -------------------------------------------------------------------------- #
-  #  FTP client — victim                                                       #
+  #  FTP client — the victim initiating transfers                              #
   # -------------------------------------------------------------------------- #
   client:
     container_name: client
@@ -44,7 +48,7 @@ services:
     restart: unless-stopped
 
   # -------------------------------------------------------------------------- #
-  #  Attacker — your code                                                      #
+  #  Attacker — runs inquisitor (transparent MITM)                             #
   # -------------------------------------------------------------------------- #
   attacker:
     container_name: attacker
@@ -58,6 +62,10 @@ services:
       - NET_ADMIN
     sysctls:
       - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.send_redirects=0
+      - net.ipv4.conf.default.send_redirects=0
+    stdin_open: true
+    tty: true
     depends_on:
       - server
       - client
@@ -67,6 +75,11 @@ services:
         mac_address: 02:42:c0:a8:00:04
     restart: unless-stopped
 
+# ---------------------------------------------------------------------------- #
+#  Lab network — custom bridge: the 3 hosts share one L2 segment (ARP works).  #
+#  Same-network containers reach every port directly, so no `ports:` mapping   #
+#  is needed for FTP (21 + passive range) between client and server.           #
+# ---------------------------------------------------------------------------- #
 networks:
   lab:
     driver: bridge

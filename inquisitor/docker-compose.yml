@@ -8,7 +8,7 @@
 #    .4  attacker (inquisitor)                                                 #
 #                                                                              #
 #  MAC plan: 02:42 (locally-administered prefix) + IPv4 in hex                 #
-#    .2 -> 02:42:c0:a8:00:02   .3 -> 02:42:c0:a8:00:03   .4 -> 02:42:c0:a8:00:04
+#  .2 -> 02:42:c0:a8:00:02   .3 -> 02:42:c0:a8:00:03   .4 -> 02:42:c0:a8:00:04 #
 #  => deterministic MACs, passed as-is to inquisitor.                          #
 # ============================================================================ #
 services:

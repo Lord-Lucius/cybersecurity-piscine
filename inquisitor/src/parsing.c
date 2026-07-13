@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/12 20:51:40 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 16:12:26 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/13 17:27:16 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,7 +43,7 @@ void print_config(t_config *config) {
 	printf(CYAN "└──────────────┴──────────────────────┘\n" RESET);
 }
 
-int ft_parse_octet (const char *nptr, int *err) {
+static int ft_parse_octet (const char *nptr, int *err) {
 	int result;
 
 	*err = 0;
@@ -55,6 +55,30 @@ int ft_parse_octet (const char *nptr, int *err) {
 		if (*nptr < '0' || *nptr > '9')
 			return (*err = 1, 0);
 		result = result * 10 + (*nptr - '0');
+		if (result > 255)
+			return (*err = 1, 0);
+		nptr++;
+	}
+	return (result);
+}
+
+static int  ft_parse_hex_octet(const char *nptr, int *err) {
+	int result;
+
+	*err = 0;
+	result = 0;
+	if (!nptr || !*nptr)
+		return (*err = 1, 0);
+	while (*nptr)
+	{
+		if (*nptr >= '0' && *nptr <= '9')
+			result = result * 16 + (*nptr - '0');
+		else if (*nptr >= 'a' && *nptr <= 'f')
+			result = result * 16 + (*nptr - 'a' + 10);
+		else if (*nptr >= 'A' && *nptr <= 'F')
+			result = result * 16 + (*nptr - 'A' + 10);
+		else
+			return (*err = 1, 0);
 		if (result > 255)
 			return (*err = 1, 0);
 		nptr++;
@@ -93,7 +117,32 @@ int is_ipv4(const char *src) {
 }
 
 int is_mac_addr(const char *src) {
-	(void)src;
+	char **split_src = NULL;
+	size_t split_src_len = 0;
+
+	split_src = ft_split(src, ':');
+	split_src_len = ft_tablen(split_src);
+	if (split_src_len != 6) {
+		ft_free_split(split_src);
+		return 1;
+	}
+	for (size_t i = 0; i < split_src_len; i++) {
+		int err;
+		if (ft_strlen(split_src[i]) != 2) {
+			ft_free_split(split_src);
+			return 1;
+		}
+		int converted_value = ft_parse_hex_octet(split_src[i], &err);
+		if (err) {
+			ft_free_split(split_src);
+			return 1;
+		}
+		if (converted_value < 0 || converted_value > 255){
+			ft_free_split(split_src);
+			return 1;
+		}
+	}
+	ft_free_split(split_src);
 	return 0;
 }
 

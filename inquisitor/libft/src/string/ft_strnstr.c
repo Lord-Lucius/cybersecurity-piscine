@@ -1,27 +1,29 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   parsing.h                                          :+:      :+:    :+:   */
+/*   ft_strnstr.c                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/10 13:52:59 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 15:21:17 by luluzuri         ###   ########.fr       */
+/*   Created: 2024/11/10 11:00:04 by lucius            #+#    #+#             */
+/*   Updated: 2024/11/12 13:41:29 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef PARSING_H
-#define PARSING_H
-
-#include "inquisitor.h"
 #include "libft.h"
 
-void parse_arguments(int ac, char **av, t_config *config);
+char	*ft_strnstr(const char *haystack, const char *needle, size_t len)
+{
+	size_t	nlen;
 
-int is_ipv4(const char *src);
-int is_mac_addr(const char *src);
-int discover_interface(t_config *config);
-
-void print_config(t_config *config);
-
-#endif
+	nlen = ft_strlen(needle);
+	if (!nlen)
+		return ((char *)haystack);
+	while (*haystack && len-- >= nlen)
+	{
+		if (!ft_strncmp(haystack, needle, nlen))
+			return ((char *)haystack);
+		haystack++;
+	}
+	return (NULL);
+}

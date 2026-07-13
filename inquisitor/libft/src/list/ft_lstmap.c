@@ -1,27 +1,35 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   parsing.h                                          :+:      :+:    :+:   */
+/*   ft_lstmap.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/10 13:52:59 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 15:21:17 by luluzuri         ###   ########.fr       */
+/*   Created: 2026/07/13 10:00:00 by luluzuri          #+#    #+#             */
+/*   Updated: 2026/07/13 10:00:00 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef PARSING_H
-#define PARSING_H
-
-#include "inquisitor.h"
 #include "libft.h"
 
-void parse_arguments(int ac, char **av, t_config *config);
+t_list	*ft_lstmap(t_list *lst, void *(*f)(void *), void (*del)(void *))
+{
+	t_list	*head;
+	t_list	*node;
 
-int is_ipv4(const char *src);
-int is_mac_addr(const char *src);
-int discover_interface(t_config *config);
-
-void print_config(t_config *config);
-
-#endif
+	head = NULL;
+	if (!f)
+		return (NULL);
+	while (lst)
+	{
+		node = ft_lstnew(f(lst->content));
+		if (!node)
+		{
+			ft_lstclear(&head, del);
+			return (NULL);
+		}
+		ft_lstadd_back(&head, node);
+		lst = lst->next;
+	}
+	return (head);
+}

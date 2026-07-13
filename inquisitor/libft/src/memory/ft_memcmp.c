@@ -1,27 +1,30 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   parsing.h                                          :+:      :+:    :+:   */
+/*   ft_memcmp.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/10 13:52:59 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 15:21:17 by luluzuri         ###   ########.fr       */
+/*   Created: 2024/11/10 10:40:05 by lucius            #+#    #+#             */
+/*   Updated: 2024/11/12 15:58:05 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef PARSING_H
-#define PARSING_H
-
-#include "inquisitor.h"
 #include "libft.h"
 
-void parse_arguments(int ac, char **av, t_config *config);
+int	ft_memcmp(const void *s1, const void *s2, size_t n)
+{
+	const unsigned char	*p1;
+	const unsigned char	*p2;
 
-int is_ipv4(const char *src);
-int is_mac_addr(const char *src);
-int discover_interface(t_config *config);
-
-void print_config(t_config *config);
-
-#endif
+	p1 = (const unsigned char *)s1;
+	p2 = (const unsigned char *)s2;
+	while (n--)
+	{
+		if (*p1 != *p2)
+			return (*p1 - *p2);
+		p1++;
+		p2++;
+	}
+	return (0);
+}

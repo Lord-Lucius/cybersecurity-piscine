@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:02:46 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/12 21:42:53 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/13 15:40:45 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,7 @@
 #include "utils.h"
 
 int main(int ac, char **av) {
-	t_config config;
+	t_config config = {0};
 	parse_arguments(ac, av, &config);
 
 	/* to delete */

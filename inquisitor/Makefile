@@ -21,9 +21,12 @@ NAME := inquisitor
 # ---------------------------------------------------------------------------- #
 CC       := cc
 CFLAGS   := -Wall -Wextra -Werror -std=gnu17 -g3 -pthread
-CPPFLAGS := -Iinclude -MMD -MP
+LIBFT_DIR = libft
+LIBFT     = $(LIBFT_DIR)/libft.a
+CPPFLAGS := -Iinclude -I$(LIBFT_DIR)/include -MMD -MP
 LDFLAGS  := -pthread
 LDLIBS   := -lpcap
+
 
 DEBUG ?=
 
@@ -61,9 +64,9 @@ RESET  := \033[0m
 
 all: $(NAME)
 
-$(NAME): $(OBJS)
+$(NAME): $(OBJS) $(LIBFT)
 	@printf "$(CYAN)-> Linking $(NAME)$(RESET)\n"
-	@$(CC) $(LDFLAGS) $(OBJS) $(LDLIBS) -o $@
+	@$(CC) $(LDFLAGS) $(OBJS) $(LIBFT) $(LDLIBS) -o $@
 	@printf "$(GREEN)OK $(NAME) built successfully$(RESET)\n"
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
@@ -71,13 +74,20 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@printf "$(YELLOW)-> Compiling$(RESET) %s\n" "$<"
 	@$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
+$(LIBFT):
+	@printf "$(CYAN)-> Building libft$(RESET)\n"
+	@$(MAKE) -C $(LIBFT_DIR) > /dev/null 2>&1
+	@printf "$(GREEN)OK libft built successfully$(RESET)\n"
+
 clean:
 	@printf "$(RED)-> Removing build objects$(RESET)\n"
 	@rm -rf $(OBJ_DIR)
+	@$(MAKE) -C $(LIBFT_DIR) clean
 
 fclean: clean
 	@printf "$(RED)-> Removing $(NAME)$(RESET)\n"
 	@rm -f $(NAME)
+	@$(MAKE) -C $(LIBFT_DIR) fclean
 
 re: fclean all
 

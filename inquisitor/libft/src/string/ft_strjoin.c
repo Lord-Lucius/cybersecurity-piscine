@@ -1,27 +1,30 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   parsing.h                                          :+:      :+:    :+:   */
+/*   ft_strjoin.c                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/10 13:52:59 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 15:21:17 by luluzuri         ###   ########.fr       */
+/*   Created: 2024/11/10 16:27:26 by lucius            #+#    #+#             */
+/*   Updated: 2024/11/26 10:41:01 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef PARSING_H
-#define PARSING_H
-
-#include "inquisitor.h"
 #include "libft.h"
 
-void parse_arguments(int ac, char **av, t_config *config);
+char	*ft_strjoin(char const *s1, char const *s2)
+{
+	size_t	flen;
+	size_t	slen;
+	char	*sub;
 
-int is_ipv4(const char *src);
-int is_mac_addr(const char *src);
-int discover_interface(t_config *config);
-
-void print_config(t_config *config);
-
-#endif
+	flen = ft_strlen(s1);
+	slen = ft_strlen(s2);
+	sub = (char *)malloc((slen + flen + 1) * sizeof(char));
+	if (!sub)
+		return (sub);
+	ft_memmove(sub, s1, flen);
+	ft_memmove(sub + flen, s2, slen);
+	sub[flen + slen] = '\0';
+	return (sub);
+}

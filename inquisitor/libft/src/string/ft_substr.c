@@ -1,27 +1,30 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   parsing.h                                          :+:      :+:    :+:   */
+/*   ft_substr.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/10 13:52:59 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 15:21:17 by luluzuri         ###   ########.fr       */
+/*   Created: 2024/11/10 15:22:50 by lucius            #+#    #+#             */
+/*   Updated: 2024/11/26 10:40:43 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef PARSING_H
-#define PARSING_H
-
-#include "inquisitor.h"
 #include "libft.h"
 
-void parse_arguments(int ac, char **av, t_config *config);
+char	*ft_substr(const char *s, unsigned int start, size_t len)
+{
+	char	*sub;
+	size_t	slen;
 
-int is_ipv4(const char *src);
-int is_mac_addr(const char *src);
-int discover_interface(t_config *config);
-
-void print_config(t_config *config);
-
-#endif
+	slen = ft_strlen(s);
+	if (start >= slen)
+		return (ft_strdup(""));
+	if (len > slen - start)
+		len = slen - start;
+	sub = (char *)malloc((len + 1) * sizeof(char));
+	if (!sub)
+		return (sub);
+	ft_strlcpy(sub, s + start, len + 1);
+	return (sub);
+}

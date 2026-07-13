@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/12 20:51:40 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/13 15:58:47 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/13 16:12:26 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,55 +43,52 @@ void print_config(t_config *config) {
 	printf(CYAN "└──────────────┴──────────────────────┘\n" RESET);
 }
 
-int ft_parse_octet (const char *nptr, int *err)
-{
-    int result;
+int ft_parse_octet (const char *nptr, int *err) {
+	int result;
 
-    *err = 0;
-    result = 0;
-    if (!nptr || !*nptr)
-        return (*err = 1, 0);
-    while (*nptr)
-    {
-        if (*nptr < '0' || *nptr > '9')
-            return (*err = 1, 0);
-        result = result * 10 + (*nptr - '0');
-        if (result > 255)
-            return (*err = 1, 0);
-        nptr++;
-    }
-    return (result);
+	*err = 0;
+	result = 0;
+	if (!nptr || !*nptr)
+		return (*err = 1, 0);
+	while (*nptr)
+	{
+		if (*nptr < '0' || *nptr > '9')
+			return (*err = 1, 0);
+		result = result * 10 + (*nptr - '0');
+		if (result > 255)
+			return (*err = 1, 0);
+		nptr++;
+	}
+	return (result);
 }
 
 int is_ipv4(const char *src) {
-	/*
-		what make an IP address (exemple: 127.0.0.1):
-			- Check if has 3 dots
-			- 4 number between 1 and 3 digits
-			- Separated by dots
-			- Numbers should be between 0 and 255
-	*/
 	char **split_src = NULL;
 	size_t split_src_len = 0;
-	size_t src_len = ft_strlen(src);
-	int dot_number = 0;
 
-	for (size_t i = 0; i < src_len; i++) {
-		if (src[i] == '.')
-			dot_number++;
-	}
-	if (dot_number != 3)
-		return 1;
 	split_src = ft_split(src, '.');
 	split_src_len = ft_tablen(split_src);
+	if (ft_tablen(split_src) != 4) {
+		ft_free_split(split_src);
+		return 1;
+	}
 	for (size_t i = 0; i < split_src_len; i++) {
 		int err;
-		if (ft_strlen(split_src[i]) < 1 || ft_strlen(split_src[i]) > 3)
+		if (ft_strlen(split_src[i]) < 1 || ft_strlen(split_src[i]) > 3) {
+			ft_free_split(split_src);
 			return 1;
+		}
 		int converted_value = ft_parse_octet(split_src[i], &err);
-		if (err)
+		if (err) {
+			ft_free_split(split_src);
 			return 1;
+		}
+		if (converted_value < 0 || converted_value > 255){
+			ft_free_split(split_src);
+			return 1;
+		}
 	}
+	ft_free_split(split_src);
 	return 0;
 }
 

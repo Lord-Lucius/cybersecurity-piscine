@@ -6,12 +6,12 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/16 17:52:07 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/23 19:43:48 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/28 11:33:15 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <cstdint>
 #include <stdio.h>
+#include <stdint.h>
 
 typedef struct s_eth_header {
 	unsigned char mac_dst[6];

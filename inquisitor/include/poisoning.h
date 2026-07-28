@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/16 17:52:07 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/28 12:03:33 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/28 15:09:35 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,10 +29,10 @@ typedef struct s_arp_msg {
 	unsigned char hardware_addr_len;
 	unsigned char protocol_addr_len;
 	unsigned char sender_mac[6];
-	unsigned char sender_ip[2];
+	unsigned char sender_ip[4];
 	unsigned char target_mac[6];
-	unsigned char target_ip[6];
-} t_arp_msg;
+	unsigned char target_ip[4];
+} __attribute__((__packed__)) t_arp_msg;
 
 typedef struct s_arp_frame {
 	t_eth_header eth;

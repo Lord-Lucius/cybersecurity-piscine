@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/12 20:51:40 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/14 09:58:35 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/28 20:30:55 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,6 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ether.h>
-
 #include "parsing.h"
 #include "inquisitor.h"
 #include "libft.h"
@@ -31,24 +30,24 @@
 
 void print_config(t_config *config) {
 	printf(CYAN "┌─────────────────────────────────────┐\n" RESET);
-	printf(CYAN "│         inquisitor — config         │\n" RESET);
+	printf(CYAN "│          inquisitor — config        │\n" RESET);
 	printf(CYAN "├──────────────┬──────────────────────┤\n" RESET);
 	printf(CYAN "│" RESET " %-12s " CYAN "│" RESET " %-20s " CYAN "│\n" RESET,
-		   "ip-src", config->ip_src);
+		   "spoof_ip", config->spoof_ip);
 	printf(CYAN "│" RESET " %-12s " CYAN "│" RESET " %-20s " CYAN "│\n" RESET,
-		   "mac-src", config->mac_src);
+		   "spoof_mac", config->spoof_mac);
 	printf(CYAN "├──────────────┼──────────────────────┤\n" RESET);
 	printf(CYAN "│" RESET " %-12s " CYAN "│" RESET " %-20s " CYAN "│\n" RESET,
-		   "ip-dest", config->ip_dest);
+		   "target_ip", config->target_ip);
 	printf(CYAN "│" RESET " %-12s " CYAN "│" RESET " %-20s " CYAN "│\n" RESET,
-		   "mac-dest", config->mac_dest);
+		   "target_mac", config->target_mac);
 	printf(CYAN "├──────────────┼──────────────────────┤\n" RESET);
 	printf(CYAN "│" RESET " %-12s " CYAN "│" RESET YELLOW " %-20s " RESET CYAN
 				"│\n" RESET,
-		   "ip-local", config->ip_local);
+		   "local_ip", config->local_ip);
 	printf(CYAN "│" RESET " %-12s " CYAN "│" RESET YELLOW " %-20s " RESET CYAN
 				"│\n" RESET,
-		   "mac-local", config->mac_local);
+		   "local_mac", config->local_mac);
 	printf(CYAN "└──────────────┴──────────────────────┘\n" RESET);
 }
 
@@ -60,7 +59,7 @@ static int ft_parse_octet(const char *nptr, int *err) {
 	if (!nptr || !*nptr) return (*err = 1, 0);
 	while (*nptr) {
 		if (*nptr < '0' || *nptr > '9') return (*err = 1, 0);
-		result = result * 10 + (*nptr - '0');
+		result = (result * 10) + (*nptr - '0');
 		if (result > 255) return (*err = 1, 0);
 		nptr++;
 	}
@@ -75,11 +74,11 @@ static int ft_parse_hex_octet(const char *nptr, int *err) {
 	if (!nptr || !*nptr) return (*err = 1, 0);
 	while (*nptr) {
 		if (*nptr >= '0' && *nptr <= '9')
-			result = result * 16 + (*nptr - '0');
+			result = (result * 16) + (*nptr - '0');
 		else if (*nptr >= 'a' && *nptr <= 'f')
-			result = result * 16 + (*nptr - 'a' + 10);
+			result = (result * 16) + (*nptr - 'a' + 10);
 		else if (*nptr >= 'A' && *nptr <= 'F')
-			result = result * 16 + (*nptr - 'A' + 10);
+			result = (result * 16) + (*nptr - 'A' + 10);
 		else
 			return (*err = 1, 0);
 		if (result > 255) return (*err = 1, 0);
@@ -96,26 +95,27 @@ int is_ipv4(const char *src) {
 	split_src_len = ft_tablen(split_src);
 	if (ft_tablen(split_src) != 4) {
 		ft_free_split(split_src);
-		return 1;
+		return (1);
 	}
 	for (size_t i = 0; i < split_src_len; i++) {
 		int err;
+
 		if (ft_strlen(split_src[i]) < 1 || ft_strlen(split_src[i]) > 3) {
 			ft_free_split(split_src);
-			return 1;
+			return (1);
 		}
 		int converted_value = ft_parse_octet(split_src[i], &err);
 		if (err) {
 			ft_free_split(split_src);
-			return 1;
+			return (1);
 		}
 		if (converted_value < 0 || converted_value > 255) {
 			ft_free_split(split_src);
-			return 1;
+			return (1);
 		}
 	}
 	ft_free_split(split_src);
-	return 0;
+	return (0);
 }
 
 int is_mac_addr(const char *src) {
@@ -126,26 +126,27 @@ int is_mac_addr(const char *src) {
 	split_src_len = ft_tablen(split_src);
 	if (split_src_len != 6) {
 		ft_free_split(split_src);
-		return 1;
+		return (1);
 	}
 	for (size_t i = 0; i < split_src_len; i++) {
 		int err;
+
 		if (ft_strlen(split_src[i]) != 2) {
 			ft_free_split(split_src);
-			return 1;
+			return (1);
 		}
 		int converted_value = ft_parse_hex_octet(split_src[i], &err);
 		if (err) {
 			ft_free_split(split_src);
-			return 1;
+			return (1);
 		}
 		if (converted_value < 0 || converted_value > 255) {
 			ft_free_split(split_src);
-			return 1;
+			return (1);
 		}
 	}
 	ft_free_split(split_src);
-	return 0;
+	return (0);
 }
 
 int discover_interface(t_config *config) {
@@ -154,7 +155,7 @@ int discover_interface(t_config *config) {
 	int socket_fd;
 	struct ifreq ifr = {0};
 
-	if (getifaddrs(&interface) == -1) return -1;
+	if (getifaddrs(&interface) == -1) return (-1);
 	tmp = interface;
 	while (tmp != NULL) {
 		if (tmp->ifa_flags & IFF_LOOPBACK) {
@@ -163,27 +164,29 @@ int discover_interface(t_config *config) {
 		}
 		if (tmp->ifa_addr != NULL && tmp->ifa_addr->sa_family == AF_INET) {
 			struct sockaddr_in *addr = (struct sockaddr_in *)tmp->ifa_addr;
-			config->ip_local = ft_strdup(inet_ntoa(addr->sin_addr));
+
+			config->local_ip = ft_strdup(inet_ntoa(addr->sin_addr));
 			socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
 			if (socket_fd == -1) {
 				freeifaddrs(interface);
-				return -1;
+				return (-1);
 			}
 			ft_strlcpy(ifr.ifr_name, tmp->ifa_name, IFNAMSIZ);
 			if (ioctl(socket_fd, SIOCGIFHWADDR, &ifr) == -1) {
 				close(socket_fd);
 				freeifaddrs(interface);
-				return -1;
+				return (-1);
 			}
 			unsigned char *mac = (unsigned char *)ifr.ifr_hwaddr.sa_data;
 			char mac_str[18];
+
 			snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
 					 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-			config->mac_local = ft_strdup(mac_str);
+			config->local_mac = ft_strdup(mac_str);
 			if (ioctl(socket_fd, SIOCGIFINDEX, &ifr) == -1) {
 				close(socket_fd);
 				freeifaddrs(interface);
-				return -1;
+				return (-1);
 			}
 			config->ifindex = ifr.ifr_ifindex;
 			close(socket_fd);
@@ -192,23 +195,22 @@ int discover_interface(t_config *config) {
 		tmp = tmp->ifa_next;
 	}
 	freeifaddrs(interface);
-	if (!config->ip_local || !config->mac_local) return -1;
-	return 0;
+	if (!config->local_ip || !config->local_mac) return (-1);
+	return (0);
 }
 
 void parse_arguments(int ac, char **av, t_config *config) {
 	if (ac != 5) error("invalid number of arguments", 1, config);
-	config->ip_src = av[1];
-	config->mac_src = av[2];
-	config->ip_dest = av[3];
-	config->mac_dest = av[4];
-	if (is_ipv4(config->ip_src) != 0) error("ip source invalid", 1, config);
-	if (is_ipv4(config->ip_dest) != 0) error("ip dest invalid", 1, config);
-	if (is_mac_addr(config->mac_src) != 0)
+	config->spoof_ip = av[1];
+	config->spoof_mac = av[2];
+	config->target_ip = av[3];
+	config->target_mac = av[4];
+	if (is_ipv4(config->spoof_ip) != 0) error("ip source invalid", 1, config);
+	if (is_ipv4(config->target_ip) != 0) error("ip dest invalid", 1, config);
+	if (is_mac_addr(config->spoof_mac) != 0)
 		error("mac source invalid", 1, config);
-	if (is_mac_addr(config->mac_dest) != 0)
+	if (is_mac_addr(config->target_mac) != 0)
 		error("mac dest invalid", 1, config);
-
 	if (discover_interface(config))
 		error("interface discovering failed", 1, config);
 }

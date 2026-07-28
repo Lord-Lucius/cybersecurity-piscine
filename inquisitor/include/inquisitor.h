@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:03:02 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/20 15:18:42 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/28 20:30:53 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,13 +14,15 @@
 #define INQUISITOR_H
 
 typedef struct s_config {
-	char *ip_src;
-	char *mac_src;
-	char *ip_dest;
-	char *mac_dest;
+	char *spoof_ip;
+	char *spoof_mac;
 
-	char *ip_local;
-	char *mac_local;
+	char *target_ip;
+	char *target_mac;
+
+	char *local_ip;
+	char *local_mac;
+
 	int ifindex;
 } t_config;
 

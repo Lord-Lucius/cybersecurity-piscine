@@ -30,8 +30,8 @@ void error(char *msg, int error_code, t_config *config) {
 
 void free_ressources(t_config *config) {
 	if (!config) return;
-	free(config->ip_local);
-	free(config->mac_local);
-	config->ip_local = NULL;
-	config->mac_local = NULL;
+	free(config->local_ip);
+	free(config->local_mac);
+	config->local_ip = NULL;
+	config->local_mac = NULL;
 }

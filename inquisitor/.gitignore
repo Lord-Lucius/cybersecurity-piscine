@@ -1,0 +1,41 @@
+# ============================================================================ #
+#  inquisitor — .gitignore                                                     #
+# ============================================================================ #
+
+# Binary
+inquisitor
+dump_frame
+
+# Build artifacts
+build/
+*.o
+*.d
+*.a
+
+# libft build artifacts
+libft/build/
+libft/*.o
+libft/*.a
+
+# Docker
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Compilation database (clangd)
+compile_commands.json
+.cache/

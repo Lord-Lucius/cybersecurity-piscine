@@ -22,8 +22,8 @@ services:
     environment:
       - FTP_USER=test
       - FTP_PASS=1234
-      - PUBLIC_IP=192.168.0.2
-      - UID=1000
+      - PUBLIC_IP=192.168.0.2      # advertised IP for the PASV data channel
+      - UID=1000                   # match ./data owner so STOR uploads are writable
     volumes:
       - ./data:/home/user
     networks:
@@ -33,12 +33,15 @@ services:
     restart: unless-stopped
 
   # -------------------------------------------------------------------------- #
-  #  FTP client — the victim initiating transfers                              #
+  #  FTP client — the victim initiating transfers (Debian for standard ARP)    #
   # -------------------------------------------------------------------------- #
   client:
     container_name: client
-    image: alpine:3.20
-    command: sh -c "apk add --no-cache lftp && sleep infinity"
+    image: debian:bookworm-slim
+    command: >
+      sh -c "apt-get update -qq &&
+             apt-get install -y -qq --no-install-recommends lftp iputils-ping net-tools &&
+             sleep infinity"
     depends_on:
       - server
     networks:
@@ -56,12 +59,14 @@ services:
     command: sleep infinity
     working_dir: /inquisitor
     volumes:
-      - .:/inquisitor
+      - .:/inquisitor            # live code + build artifacts shared with host
     cap_add:
-      - NET_RAW
-      - NET_ADMIN
+      - NET_RAW                  # forge/inject raw L2 frames (ARP)
+      - NET_ADMIN                # manage interface / forwarding
     sysctls:
+      # relay intercepted traffic to the real destination (keeps FTP alive)
       - net.ipv4.ip_forward=1
+      # don't let the kernel tell victims to bypass us via ICMP redirects
       - net.ipv4.conf.all.send_redirects=0
       - net.ipv4.conf.default.send_redirects=0
     stdin_open: true

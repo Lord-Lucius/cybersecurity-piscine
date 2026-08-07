@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/28 15:06:51 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/29 16:34:10 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/07/30 11:21:01 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,11 +92,9 @@ void restore_arp(int fd, t_config config) {
 	t_arp_frame out;
 	build_arp_trame(&out, c_out);
 
-	usleep(200000);
 	for (int i = 0; i < 5; i++) {
 		send_arp_frame(fd, &in, c_in);
-		usleep(100000);
 		send_arp_frame(fd, &out, c_out);
-		usleep(100000);
+		sleep(1);
 	}
 }

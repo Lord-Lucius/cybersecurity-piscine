@@ -25,14 +25,23 @@ def compose_exec(container, cmd, timeout=5):
 
 
 def get_arp_mac(container, ip):
-    """Parse arp -n and return MAC for the given IP, or None."""
+    """Parse arp -n — handles both Alpine (BSD) and Debian (table) formats."""
     stdout, _, _ = compose_exec(container, ["arp", "-n"])
     for line in stdout.splitlines():
-        if ip in line and "at" in line:
-            parts = line.split()
-            for i, p in enumerate(parts):
-                if p == "at" and i + 1 < len(parts):
-                    return parts[i + 1]
+        if ip not in line:
+            continue
+        parts = line.split()
+        # Alpine/BSD: ? (IP) at MAC [ether] on eth0
+        if "at" in parts:
+            idx = parts.index("at")
+            if idx + 1 < len(parts):
+                mac = parts[idx + 1]
+                if mac not in ("(incomplete)", "<incomplete>"):
+                    return mac
+        # Debian table: IP  ether  MAC  C  Iface
+        elif len(parts) >= 3 and parts[0] == ip:
+            if parts[2] not in ("(incomplete)", "<incomplete>", "HWaddress"):
+                return parts[2]
     return None
 
 

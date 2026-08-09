@@ -71,10 +71,22 @@ Piège classique : [Le piège précis qu'un débutant va rencontrer + comment l'
 
 ## 5. Pseudo-code de cadrage
 
-> Pseudo-code uniquement — pas de code compilable. Le but est de guider la structure
-> algorithmique sans donner la solution.
+> Pseudo-code uniquement pour la **logique** — pas de code compilable. Le but est
+> de guider la structure algorithmique sans donner la solution.
+>
+> **Exception — prototypes :** les **signatures de fonctions et définitions de
+> types/structs** peuvent être données dans le **langage cible du projet, en
+> clair** (C, Rust, Go, Python, TypeScript, …), car elles constituent un
+> *contrat d'interface* (ce qui entre / ce qui sort), pas la solution. Les placer
+> dans un **bloc séparé** du pseudo-code — une sous-section « Prototypes
+> (<langage>) » ou un bloc de code balisé (```c, ```rust, ```go, ```py…) — placé
+> **avant** le pseudo-code de logique, qui lui reste en français.
 
 ### 5.1 [Nom du premier fichier ou module]
+
+> Optionnel : ouvrir par un bloc « Prototypes (<langage>) » listant les
+> signatures et types concernés dans le langage du projet, puis enchaîner sur le
+> pseudo-code de logique en français.
 
 ```
 [Pseudo-code lisible, en français, avec majuscules pour les mots-clés

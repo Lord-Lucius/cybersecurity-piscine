@@ -1,8 +1,9 @@
 # Inquisitor — Document 2 : Ce qui est fait & problèmes à corriger
 
 > Revue détaillée, module par module, de ce qui est réalisé, avec les
-> **problèmes / points d'attention** repérés dans le code existant. Sévérité :
-> 🔴 bloquant · 🟠 à corriger avant soutenance · 🟡 amélioration / robustesse.
+> **problèmes / points d'attention** repérés dans le code existant (état au
+> **09/08/2026**). Sévérité : 🔴 bloquant · 🟠 à corriger avant soutenance ·
+> 🟡 amélioration / robustesse.
 
 ---
 
@@ -95,24 +96,58 @@
 
 ---
 
-## 5. Sniffing FTP — `src/sniffing.c`, `include/sniffing.h` 🔴 **NON FAIT**
+## 5. Sniffing FTP — `src/sniffing.c`, `include/sniffing.h` 🔴 **AMORCÉ, NON FONCTIONNEL**
 
-**État réel :**
-- `src/sniffing.c` : **100 % commenté**. Contient un brouillon `pcap_open_live` +
-  `packet_handler` qui dumpe le payload brut, mais **rien n'est compilé ni
-  appelé**.
-- `include/sniffing.h` : **fichier vide (0 octet)**.
-- **Aucune fonction de sniffing n'est déclarée, définie ou intégrée à `main`.**
+**État réel (mise à jour 09/08) :**
+- `include/sniffing.h` : **désormais rempli** (n'est plus vide). Il inclut
+  `pcap.h`, `pthread.h`, les en-têtes réseau, et déclare :
+  ```c
+  typedef struct s_sniffer {
+      pcap_t    *handle;
+      pthread_t  thread;
+      int        verbose;
+  } t_sniffer;
+
+  t_sniffer start_sniffer(t_config config, int verbose);
+  void      capture_loop(t_sniffer s);
+  void      ftp_handler();
+  void      stop_sniffer(t_sniffer s);
+  ```
+- `src/sniffing.c` : le brouillon commenté (`pcap_open_live` + `packet_handler`)
+  a été **supprimé**. Il ne reste qu'un **stub** :
+  ```c
+  void test(void) { printf("just test functions"); }
+  ```
+  Aucune des fonctions déclarées dans le `.h` n'est **définie**.
+- **`main.c` n'appelle ni `start_sniffer` ni `stop_sniffer`** → le sniffer n'est
+  pas intégré à la boucle.
 
 **Problèmes :**
 - 🔴 **Exigence mandatory non satisfaite** : « afficher en temps réel les noms des
-  fichiers échangés entre un client et un serveur FTP ». Rien n'est implémenté.
-- 🔴 `-lpcap` est lié dans le Makefile mais **jamais utilisé** → dette prête à
-  l'emploi, mais code absent.
+  fichiers échangés entre un client et un serveur FTP ». Le contrat d'interface
+  existe, mais **aucune capture n'est implémentée**.
+- 🔴 `-lpcap` est lié dans le Makefile mais **toujours jamais utilisé** dans le
+  code compilé (aucun appel `pcap_*`).
+- 🟠 **Signatures à réconcilier avec l'architecture cible (Doc 3, Module A) :**
+  - `start_sniffer` / `stop_sniffer` / `capture_loop` prennent `t_sniffer` **par
+    valeur** ; or `capture_loop` doit lancer `pcap_loop` dans le thread et
+    `stop_sniffer` doit faire `breakloop → join → close` — travailler sur une
+    **copie** de la struct (donc du `pcap_t*`/`pthread_t`) est fragile. Passer un
+    `t_sniffer*` serait plus sûr.
+  - `ftp_handler()` est déclarée **sans paramètres**, alors que le prototype
+    imposé par `pcap_loop` est `void handler(u_char*, const struct pcap_pkthdr*,
+    const u_char*)`. À corriger avant toute compilation d'un vrai handler.
+  - `start_sniffer(t_config config, ...)` reçoit `config` **par valeur** : à
+    surveiller vis-à-vis des pointeurs partagés `local_ip`/`local_mac` (même
+    piège qu'au §3).
+- 🔴 **`t_config` (inquisitor.h) ne stocke pas l'interface** : pas de champ
+  `iface`. Le sniffer doit ouvrir `pcap_open_live` sur l'IF découverte, or
+  `discover_interface` connaît `ifa_name` mais ne le conserve pas. Champ à
+  ajouter (voir Doc 3, A.2).
 - 🔴 Le sniffing doit tourner **en même temps** que le poisoning. Le Makefile
-  utilise déjà `-pthread` (donc un thread de capture était prévu), mais aucun
-  thread n'existe. Décision d'architecture à prendre (thread vs `pcap` non-bloquant
-  dans la boucle).
+  utilise déjà `-pthread` (thread de capture prévu) et `t_sniffer` réserve un
+  `pthread_t`, mais **aucun thread n'est créé**. L'architecture (thread dédié +
+  arrêt `breakloop → join → close`) reste à câbler.
 
 ---
 
@@ -120,9 +155,11 @@
 
 **État réel :**
 - `usage()` (dans `utils.c`) mentionne `[-v]`, mais :
-  - `usage()` **n'est jamais appelée**,
-  - `parse_arguments` **refuse tout ce qui n'a pas exactement 4 args** → lancer
-    avec `-v` donne actuellement une erreur.
+  - `usage()` **n'est jamais appelée** (les erreurs passent par `error()`),
+  - `parse_arguments` **refuse tout ce qui n'a pas exactement 4 args** (`ac != 5`)
+    → lancer avec `-v` donne actuellement une erreur.
+- `t_sniffer` réserve déjà un champ `int verbose` (design anticipé), mais
+  **`t_config` n'a aucun champ `verbose`** et rien ne le propage.
 - Aucune logique verbose.
 
 **Problème :**
@@ -145,12 +182,12 @@
 **Problèmes :**
 - 🟠 **Aucun test FTP** alors que le sujet l'exige explicitement (« une suite de
   tests spécifique à ce protocole est donc requise »). À créer avec le module 5.
-- 🟡 Le `README.md` décrit une arborescence `src/` (args.c, netinfo.c, arp.c,
-  inject.c, sniff.c, ftp.c…) qui **ne correspond pas** aux fichiers réels
-  (`parsing.c`, `poisoning.c`, `sniffing.c`…). À réaligner avant rendu pour ne pas
-  induire l'évaluateur en erreur.
-- 🟡 Le `README` promet un affichage `[FTP] STOR ...` / `[FTP] RETR ...` qui
-  n'existe pas encore dans le code. Cohérence à rétablir une fois le module 5 fait.
+- ✅ **`README.md` réaligné (09/08)** : l'arborescence liste désormais les vrais
+  fichiers (`parsing.c`, `poisoning.c`, `sniffing.c`, `utils.c`…), le nom
+  `docker-compose.yml` est corrigé, et une section « Project status » indique
+  clairement que le sniffing FTP est **WIP** (le format `[FTP] STOR/RETR` y est
+  présenté comme cible, pas comme sortie actuelle). Plus de risque d'induire
+  l'évaluateur en erreur.
 
 ---
 
@@ -158,11 +195,14 @@
 
 | Sévérité | Où | Correction |
 |----------|-----|-----------|
-| 🔴 | `sniffing.c` / `.h` | Implémenter tout le module 5 (voir Doc 3) |
+| 🔴 | `sniffing.c` | Définir/implémenter les fonctions déclarées (pcap open + filtre + handler) |
+| 🔴 | `main.c` | Intégrer `start_sniffer` / `stop_sniffer` dans la boucle |
+| 🔴 | `inquisitor.h` | Ajouter `char *iface` à `t_config` (+ le peupler dans `discover_interface`) |
 | 🔴 | tests | Ajouter une suite de tests FTP |
+| 🟠 | `sniffing.h` | Réconcilier les signatures (passage par pointeur, prototype `ftp_handler` conforme à `pcap_loop`) |
 | 🟠 | `discover_interface` | Libérer `local_ip` sur chemin d'erreur |
 | 🟠 | `build_arp_trame` | Clarifier le passage de `config` à `error()` (copie vs original) |
 | 🟠 | boucle / restore | Rendre le `CTRL+C` plus réactif (sleep interruptible) |
-| 🟠 | `README.md` | Réaligner l'arborescence et les exemples sur le code réel |
+| ✅ | `README.md` | ~~Réaligner l'arborescence et les exemples~~ — **fait (09/08)** |
 | 🟡 | `parsing.c` | Retirer les tests morts `< 0`, documenter la convention de retour |
 | 🟡 | `send_arp_frame` | `memset` du `sockaddr_ll` / de la trame |

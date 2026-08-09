@@ -10,6 +10,25 @@ restored to their original state.
 
 ---
 
+## Project status
+
+| Feature | State |
+|---|---|
+| Argument parsing & IPv4 / MAC validation | ✅ done |
+| Local interface / MAC / ifindex discovery | ✅ done |
+| Full-duplex ARP poisoning | ✅ done |
+| ARP restore on `Ctrl-C` (exit 0) | ✅ done |
+| Docker lab (`make up`) | ✅ done |
+| **FTP sniffing — filename display** | 🔶 **work in progress** (interface declared in `sniffing.h`, not yet implemented) |
+| FTP-specific test suite | ❌ to do |
+| `-v` verbose mode (bonus) | ❌ to do |
+
+> The ARP layer is complete and tested. The FTP sniffing described below is the
+> intended behaviour and is **not functional yet** — the `[FTP] STOR/RETR ...`
+> output shown in the walkthrough is the target format, not current output.
+
+---
+
 ## Requirements
 
 | Dependency | Purpose |
@@ -145,6 +164,7 @@ make logs     # follow container logs
 make shell    # open a shell in the attacker container
 make down     # stop the lab
 make lab-clean# stop lab + remove volumes
+make help     # list every target
 ```
 
 ---
@@ -153,21 +173,38 @@ make lab-clean# stop lab + remove volumes
 
 ```
 .
-├── Makefile
-├── docker-compose.yaml
+├── Makefile                    # local build + Docker lab orchestration
+├── docker-compose.yml          # 3-container lab (server / client / attacker)
 ├── attacker/
-│   └── Dockerfile          # attacker image (cc + libpcap-dev)
-├── data/                   # FTP server root (bind-mounted)
+│   └── Dockerfile              # attacker image (cc + libpcap-dev + FTP tools)
+├── data/                       # FTP server root (bind-mounted)
 │   └── hello.txt
+├── libft/                      # 42 utility library (static, linked into the binary)
 ├── include/
-│   └── inquisitor.h
-└── src/
-    ├── main.c
-    ├── args.c              # parsing + validation of the 4 parameters
-    ├── netinfo.c           # local interface / MAC discovery
-    ├── arp.c               # ARP frame construction (poison + restore)
-    ├── inject.c            # AF_PACKET raw socket + sendto
-    ├── sniff.c             # libpcap open / BPF filter / capture loop
-    ├── ftp.c               # TCP payload parser — extracts filenames
-    └── signals.c           # SIGINT handler + graceful shutdown
+│   ├── inquisitor.h            # t_config + shared types
+│   ├── parsing.h               # arg parsing / validation / interface discovery
+│   ├── poisoning.h             # ARP frame structs + poisoning prototypes
+│   ├── signals.h               # SIGINT handler
+│   ├── sniffing.h              # libpcap sniffer interface (WIP)
+│   └── utils.h                 # error / usage / cleanup
+├── src/
+│   ├── main.c                  # entry point: setup → poison loop → restore
+│   ├── parsing.c               # 4-arg parsing, IPv4/MAC validation, local IF discovery
+│   ├── poisoning.c             # ARP reply build + AF_PACKET raw inject + restore
+│   ├── signals.c               # SIGINT → graceful stop (g_running)
+│   ├── sniffing.c              # libpcap FTP capture (WIP — not yet implemented)
+│   └── utils.c                 # error handling, usage, resource cleanup
+└── tests/
+    ├── helpers.py              # shared test helpers (compose exec, ARP cache)
+    ├── test_args.py            # argument-count validation
+    ├── test_ipv4.py            # IPv4 parser
+    ├── test_mac.py             # MAC parser
+    ├── test_poisoning.py       # ARP overwrite / restore / frame fields
+    ├── dump_frame.c            # helper to dump a captured ARP frame
+    └── run_all.py              # runs the whole Python suite
 ```
+
+> Note: parsing, interface discovery and validation all live in `parsing.c`
+> (there is no separate `args.c` / `netinfo.c`); ARP build, raw injection and
+> restore all live in `poisoning.c`. FTP payload parsing will live in
+> `sniffing.c` once implemented.

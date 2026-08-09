@@ -6,10 +6,11 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:02:46 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/29 15:25:31 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/08 19:09:07 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
+#include "sniffing.h"
 #include "parsing.h"
 #include "inquisitor.h"
 #include "poisoning.h"

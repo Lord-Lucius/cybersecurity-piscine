@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:03:02 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/28 20:30:53 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/09 21:00:43 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,9 @@ typedef struct s_config {
 	char *local_mac;
 
 	int ifindex;
+
+	char iface;
+	int verbose;
 } t_config;
 
 #endif

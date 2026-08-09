@@ -1,7 +1,7 @@
 # Inquisitor — Document 1 : Où on en est
 
 > État des lieux du projet `inquisitor` (ARP poisoning / MITM — Cybersecurity
-> Piscine @ 42) au **08/08/2026**. Ce document situe l'avancement global ; le
+> Piscine @ 42) au **09/08/2026**. Ce document situe l'avancement global ; le
 > détail du « fait » et des problèmes est dans le Document 2, le plan du reste à
 > faire dans le Document 3.
 
@@ -17,29 +17,36 @@ Le projet se découpe naturellement en **6 modules**. Voici leur statut :
 | 2 | Découverte interface locale | `src/parsing.c` (`discover_interface`) | ✅ **Fait** | IP/MAC/ifindex local |
 | 3 | Empoisonnement ARP (full-duplex) | `src/poisoning.c`, `include/poisoning.h` | ✅ **Fait** | poison bidirectionnel |
 | 4 | Restauration ARP (CTRL+C) | `src/poisoning.c` (`restore_arp`), `src/signals.c` | ✅ **Fait** | restore tables + exit 0 |
-| 5 | **Sniffing FTP + affichage fichiers** | `src/sniffing.c`, `include/sniffing.h` | ❌ **À faire** | **cœur du mandatory manquant** |
+| 5 | **Sniffing FTP + affichage fichiers** | `src/sniffing.c`, `include/sniffing.h` | 🔶 **Amorcé (squelette)** | **cœur du mandatory encore manquant** |
 | 6 | Mode verbose `-v` (bonus) | — | ❌ **À faire** | bonus |
 
 **Résumé en une phrase :** toute la partie **réseau bas niveau (ARP)** est
-opérationnelle et testée ; il manque la partie **capture / analyse du trafic
-FTP**, qui est pourtant une **exigence obligatoire du sujet**.
+opérationnelle et testée ; la partie **capture / analyse du trafic FTP** vient
+d'être **amorcée** (le contrat d'interface `sniffing.h` existe désormais) mais
+**n'a aucune implémentation** ni intégration — c'est pourtant une **exigence
+obligatoire du sujet**.
 
 ---
 
 ## 2. Progression estimée
 
 ```
-Mandatory  [██████████████████░░░░░░]  ~70 %
+Mandatory  [██████████████████░░░░░░]  ~72 %
   Parsing / validation      ████████████  100 %
   Interface locale          ████████████  100 %
   Poisoning full-duplex      ████████████  100 %
   Restore (CTRL+C)           ████████████  100 %
-  Sniffing FTP (filenames)   ░░░░░░░░░░░░    0 %   <-- bloquant
+  Sniffing FTP (filenames)   █░░░░░░░░░░░   ~10 %  <-- bloquant (squelette seul)
   Tests FTP                  ░░░░░░░░░░░░    0 %
 
 Bonus      [░░░░░░░░░░░░░░░░░░░░░░░░]    0 %
   Verbose -v                 ░░░░░░░░░░░░    0 %
 ```
+
+> Le module 5 est passé de « brouillon commenté » à « **contrat d'interface
+> déclaré** » : `include/sniffing.h` définit `t_sniffer` et les prototypes, mais
+> `src/sniffing.c` ne contient qu'un stub `test()` et **rien n'est appelé depuis
+> `main`**. On a donc gagné le design, pas la fonctionnalité.
 
 > Rappel du sujet : **le bonus n'est évalué que si le mandatory est parfait.**
 > Tant que le module 5 (sniffing FTP) n'est pas terminé, le projet n'est **pas
@@ -65,17 +72,30 @@ Bonus      [░░░░░░░░░░░░░░░░░░░░░░�
 
 ## 4. Ce qui ne fonctionne pas / manque
 
-- **`src/sniffing.c` est intégralement commenté** — aucune capture réelle.
-- **`include/sniffing.h` est vide (0 octet)**.
+- **`include/sniffing.h` est désormais rempli** (struct `t_sniffer` = handle
+  `pcap_t*` + `pthread_t` + `verbose`, plus les prototypes `start_sniffer`,
+  `capture_loop`, `ftp_handler`, `stop_sniffer`) — mais ces signatures sont un
+  **contrat à valider** (voir Doc 2 §5), pas une implémentation.
+- **`src/sniffing.c` ne contient qu'un stub `test()`** : le brouillon
+  `pcap_open_live` / `packet_handler` a été supprimé. **Aucune capture réelle,
+  aucune des fonctions déclarées n'est définie.**
+- **`main.c` n'intègre pas le sniffer** : ni `start_sniffer` ni `stop_sniffer`
+  ne sont appelés.
+- **`t_config` (inquisitor.h) n'a ni champ `iface` ni champ `verbose`**, pourtant
+  nécessaires au sniffer (interface à ouvrir) et au bonus.
 - **Aucun affichage des noms de fichiers FTP** (exigence mandatory).
 - **Aucune suite de tests spécifique FTP** (exigée par le sujet).
-- Le flag **`-v` (bonus)** n'est ni parsé ni implémenté.
-- `-lpcap` est lié dans le Makefile mais **jamais utilisé** dans le code.
+- Le flag **`-v` (bonus)** n'est ni parsé ni implémenté (`parse_arguments`
+  refuse tout ce qui n'a pas exactement 4 args).
+- `-lpcap` est lié dans le Makefile mais **jamais utilisé** dans le code compilé.
 
 ---
 
 ## 5. Prochaine étape immédiate
 
-Attaquer le **module 5 (sniffing FTP)** : c'est le seul verrou qui empêche le
-mandatory d'être complet. Le plan détaillé (concepts, architecture, pseudo-code,
-tests) est dans le **Document 3**.
+Terminer le **module 5 (sniffing FTP)** : c'est le seul verrou qui empêche le
+mandatory d'être complet. Le squelette d'interface est posé ; il reste à
+**réconcilier les signatures** avec l'architecture cible, **ajouter `iface` à
+`t_config`**, puis **implémenter la capture, le parsing FTP et le thread**. Le
+plan détaillé (concepts, architecture, pseudo-code, tests) est dans le
+**Document 3**.

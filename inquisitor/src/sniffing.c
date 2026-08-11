@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/08 15:50:39 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/09 22:32:35 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/11 15:35:28 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,5 +53,17 @@ void  *capture_loop(void *arg) {
 	return NULL;
 }
 
-// void  ftp_handler(unsigned char *user, const struct pcap_pkthdr *header, const unsigned char *packet);
+void  ftp_handler(unsigned char *user, const struct pcap_pkthdr *header, const unsigned char *packet) {
+	t_sniffer *s = (t_sniffer *)user;
+	unsigned int clen = header->caplen;
+
+	if (clen < 14 + 20 + 20)
+		return;
+	struct ether_header *eth = packet;
+	if (stohs(eth->ether_type) != ETHERTYPE_IP)
+		return;
+
+	struct ip *ip = (packet + 14);
+	unsigned int ip_len = ip->ip_hl * 4;
+}
 // void  stop_sniffer(t_sniffer *s);

@@ -6,12 +6,14 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:03:02 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/09 21:00:43 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/11 17:15:20 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef INQUISITOR_H
 #define INQUISITOR_H
+
+#include <net/if.h>
 
 typedef struct s_config {
 	char *spoof_ip;
@@ -25,7 +27,7 @@ typedef struct s_config {
 
 	int ifindex;
 
-	char iface;
+	char iface[IFNAMSIZ];
 	int verbose;
 } t_config;
 

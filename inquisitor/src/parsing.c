@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/12 20:51:40 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/28 20:30:55 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/11 17:21:53 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -189,6 +189,7 @@ int discover_interface(t_config *config) {
 				return (-1);
 			}
 			config->ifindex = ifr.ifr_ifindex;
+			ft_strlcpy(config->iface, tmp->ifa_name, IFNAMSIZ);
 			close(socket_fd);
 			break;
 		}

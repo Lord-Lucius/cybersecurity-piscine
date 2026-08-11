@@ -1,343 +1,606 @@
 # Inquisitor — Document 3 : Plan du reste à faire (par module)
 
-> Plan opérationnel de tout ce qui reste, découpé en **5 modules autonomes**
-> (A→E), chacun avec : objectif, concepts, étapes, pseudo-code / corrections
-> concrètes, pièges et tests. Format inspiré de `template_doc.md`.
+> Plan opérationnel de tout ce qui reste, découpé en **modules autonomes**.
+> Chacun donne : objectif, concepts, décisions, pseudo-code (à l'anglaise) et
+> pièges avec leur symptôme. Rédigé selon `template_doc.md` — prose en français,
+> pseudo-code et logs en anglais (§ 10 du template).
 >
-> **Ordre imposé :** A → B → C → D, puis E (bonus) uniquement si le mandatory est
-> parfait.
+> **Ordre imposé :** A → B → C, puis E (bonus) uniquement si le mandatory est
+> parfait. (D — cohérence README — est **fait**, voir § 6.)
 
 ---
 
-## 1. Vue d'ensemble des modules
+## 1. Où on en est
 
-| Module | Titre | Priorité | Sévérité | Bloque le rendu ? |
-|--------|-------|----------|----------|-------------------|
-| **A** | Sniffing FTP + affichage des fichiers | 1 | 🔴 | **Oui** (exigence mandatory) |
-| **B** | Tests FTP | 2 | 🔴 | **Oui** (exigés par le sujet) |
-| **C** | Robustesse (mémoire, CTRL+C, trames) | 3 | 🟠 | Non, mais attendu en soutenance |
-| ~~**D**~~ | ~~Cohérence documentaire (README)~~ | — | ✅ | **Fait (09/08)** |
-| **E** | Bonus verbose `-v` | 5 | 🟢 | Non (bonus) |
+**Fait (voir Doc 1 & 2) :**
+- Parsing, découverte de l'interface locale, poisoning ARP full-duplex, restore
+  sur CTRL+C : opérationnels et testés (suite Python ARP verte).
+- **`include/sniffing.h` est réconcilié** : `t_sniffer` (handle `pcap_t*` +
+  `pthread_t` + `verbose`) et les prototypes passent bien par **pointeur**, et
+  `ftp_handler` a la signature imposée par `pcap_loop`. Le contrat de A.3 est
+  donc **déjà atteint** côté header.
+- **`t_config` a gagné `iface` et `verbose`** — mais `iface` est typé `char` au
+  lieu de `char *` (voir piège § 5). `discover_interface` **ne stocke pas encore**
+  le nom de l'interface.
+- **`src/sniffing.c` est amorcé** : `start_sniffer`, `capture_loop` et un début de
+  `ftp_handler` sont écrits, mais **buggés et incomplets** ; `stop_sniffer` est en
+  commentaire. **Rien n'est intégré à `main`** et le binaire de sniffing ne
+  compile pas en l'état (voir § 5).
 
-**Architecture cible globale (après A) :**
+**À faire dans cette phase :**
+- Module A : rendre le sniffing FTP fonctionnel (capture → parse `STOR`/`RETR` →
+  thread → arrêt propre) et l'intégrer à `main`.
+- Module B : une suite de tests FTP (`tests/test_ftp.py`).
+- Module C : corrections de robustesse (mémoire, CTRL+C, structs).
+
+**Ce qui suit :**
+- Module E (bonus `-v`) : n'entre en jeu que si A→C sont parfaits.
+
+> **Norme** — cette section périme à chaque avancée. L'architecture d'ensemble est
+> dans le README ; le détail du « fait » est dans le Doc 2.
+
+### Vue d'ensemble des modules
+
+| Module | Titre | Sévérité | Bloque le rendu ? |
+|--------|-------|----------|-------------------|
+| **A** | Sniffing FTP + affichage des fichiers | 🔴 | **Oui** (exigence mandatory) |
+| **B** | Tests FTP | 🔴 | **Oui** (exigés par le sujet) |
+| **C** | Robustesse (mémoire, CTRL+C, trames) | 🟠 | Non, mais attendu en soutenance |
+| ~~**D**~~ | ~~Cohérence documentaire (README)~~ | ✅ | **Fait** |
+| **E** | Bonus verbose `-v` | 🟢 | Non (bonus) |
+
+---
+
+## 2. Architecture cible
+
+Le sniffer vit **à côté** de la boucle de poison, dans un thread dédié, parce que
+`pcap_loop` bloque. `main` orchestre les deux et garantit l'**ordre d'arrêt**.
 
 ```
 main()
- ├─ setup_signals()                     [fait]
- ├─ parse_arguments()                   [fait] (+ flag -v au module E)
- ├─ build_arp_trame() x2 (in/out)       [fait]
- ├─ open_inject_socket()                [fait]
- ├─ start_sniffer()   ◄── Module A : thread pcap "tcp port 21"
- ├─ while (g_running) { send in/out ; sleep }   [fait]
- ├─ stop_sniffer()    ◄── Module A : breakloop -> join -> close
- ├─ restore_arp()                       [fait]
- └─ free / close                        [fait]
+ ├─ setup_signals()                          [fait]
+ ├─ parse_arguments()          (+ flag -v, module E)
+ ├─ discover_interface()       (+ stocke iface, module A.1)
+ ├─ build_arp_trame() x2 (in/out)            [fait]
+ ├─ open_inject_socket()                     [fait]
+ ├─ start_sniffer(&s, &config) ──▶ pthread_create ──▶ capture_loop (thread)
+ │                                                       └─ pcap_loop → ftp_handler(paquet)
+ ├─ while (g_running) { send in ; send out ; sleep }     [fait]   ║ tourne en parallèle
+ ├─ stop_sniffer(&s)   =  pcap_breakloop → pthread_join → pcap_close
+ ├─ restore_arp()                            [fait]
+ └─ close(fd) ; free_ressources()            [fait]
 ```
 
+**Point clé sur le flux :** l'arrêt est le seul endroit non trivial. `main` (thread
+principal) et `capture_loop` (thread sniffer) partagent le `pcap_t*`. Fermer le
+handle pendant que le thread est encore dans `pcap_loop` provoque un
+use-after-free. L'ordre `breakloop → join → close` est donc **impératif** et doit
+s'exécuter **avant** `restore_arp` (voir § 5).
+
 ---
+
+## 3. Concepts à maîtriser
+
+### 3.1 libpcap — le cycle de vie complet
+
+Capturer, ce n'est pas juste « ouvrir et lire ». C'est une **chaîne d'appels
+ordonnée** dont chaque maillon peut échouer et doit être testé : ouvrir →
+vérifier le datalink → compiler le filtre → l'appliquer → boucler → arrêter →
+fermer. Le **pourquoi** de l'ordre : on ne peut pas filtrer un handle pas ouvert,
+ni fermer un handle qu'un thread lit encore.
+
+Documentation :
+- « Programming with pcap » (le tuto fondateur, à lire en entier) : https://www.tcpdump.org/pcap.html
+- pcap(3) puis le man de **chaque** fonction appelée : https://www.tcpdump.org/manpages/pcap.3pcap.html
+- Précédent dans le dépôt : aucun — c'est la première fois qu'on appelle `pcap_*`.
+
+> Analogie : un micro qu'on branche sur le câble. On l'installe, on règle la
+> fréquence (le filtre), on écoute, puis on **débranche dans l'ordre** avant de
+> ranger — sinon on arrache le fil.
+
+⚠️ **Piège classique** : oublier `promisc=1`. **Symptôme** : le MITM marche (les
+tables ARP sont bien empoisonnées, `restore` fonctionne) mais **l'affichage FTP
+reste vide**, parce que la carte ne remonte que le trafic qui lui est adressé, pas
+le trafic relayé. On croit à un bug de parsing alors que rien n'est capturé.
+
+### 3.2 Descente des couches par offsets calculés (Eth → IP → TCP → payload)
+
+Le payload FTP n'est pas à une position fixe. On « descend » les couches en
+ajoutant des offsets **calculés à partir des champs de longueur**, jamais en dur.
+Le **pourquoi** : IP et TCP ont des champs d'options de taille variable, donc
+`+14+20+20` ne tombe juste que sur les paquets sans options.
+
+Documentation :
+- Les structs, directement dans les headers système (plus fiable que tout tuto) :
+  `/usr/include/net/ethernet.h`, `/usr/include/netinet/ip.h`,
+  `/usr/include/netinet/tcp.h`.
+
+> Analogie : un train dont chaque wagon annonce sa propre longueur sur sa porte.
+> Pour atteindre le wagon 4, on lit les longueurs 1, 2, 3 — on ne suppose pas que
+> tous les wagons font la même taille.
+
+⚠️ **Piège classique** : lire `ip_hl` ou `doff` comme un nombre d'octets. Ce sont
+des **mots de 4 octets** : la longueur réelle est `× 4`. **Symptôme** : sur un
+paquet à options TCP, le payload est lu 12 octets trop tôt, et `[FTP] STOR …`
+affiche des caractères parasites collés devant le nom, de façon **intermittente**
+(seulement quand il y a des options) — le pire genre de bug à diagnostiquer.
+
+### 3.3 Payload non terminé par `\0`
+
+Un buffer réseau n'est **pas** une chaîne C. Il n'y a pas de `\0` final : sa fin
+est donnée par une **longueur** (`caplen − entêtes`). Le **pourquoi** : `strlen`,
+`strstr`, `printf("%s")` liront au-delà du paquet, dans la mémoire suivante.
+
+> Analogie : une découpe dans un rouleau de papier continu. On sait où couper
+> parce qu'on a mesuré, pas parce qu'il y a un bord.
+
+⚠️ **Piège classique** : `printf("[FTP] %s\n", payload)`. **Symptôme** : la ligne
+attendue s'affiche **suivie d'octets aléatoires** (ou l'ASan crie
+`heap-buffer-overflow READ`). Il faut itérer avec la longueur et borner chaque
+`printf` à `%.*s`.
+
+### 3.4 Protocole FTP de contrôle (RFC 959, port 21, texte clair)
+
+Le canal de contrôle transporte des **commandes texte, une par ligne**, terminées
+par `\r\n`. Le mandatory ne cible que `STOR <fichier>` (upload) et `RETR
+<fichier>` (download). Le **pourquoi** de la tolérance nécessaire : un segment TCP
+peut porter **0, 1 ou plusieurs lignes**, ou une ligne coupée en deux segments.
+La casse est indifférente (`stor`, `STOR`).
+
+Documentation :
+- RFC 959, § 4 (commandes) & § 5 : https://www.rfc-editor.org/rfc/rfc959
+
+> Analogie : un télégraphe. Chaque message finit par un « STOP » (`\r\n`) ;
+> plusieurs messages peuvent arriver dans la même dépêche.
+
+⚠️ **Piège classique** : traiter un segment = une ligne. **Symptôme** : un client
+qui envoie `USER x\r\nPASS y\r\n` en un seul segment ne fait afficher **que la
+première** ligne (bonus `-v`), et un `STOR` collé à une réponse serveur est raté.
+Itérer sur les `\n` avec `memchr`.
+
+### 3.5 Concurrence sniffer ↔ poison (pthreads)
+
+`pcap_loop` bloque, donc il tourne dans un **thread dédié** pendant que `main`
+empoisonne. Le **pourquoi** de l'ordre d'arrêt : deux threads partagent le
+`pcap_t*` ; il faut d'abord faire **sortir** le thread de `pcap_loop`
+(`breakloop`), **attendre** qu'il ait fini (`join`), et **seulement après**
+libérer le handle (`close`).
+
+Documentation :
+- `man 3 pthread_create`, `man 3 pthread_join`, `pcap_breakloop`(3).
+
+> Analogie : on ne débranche pas la platine (`close`) pendant que le bras de
+> lecture y est encore posé (`pcap_loop`) ; on relève le bras d'abord.
+
+⚠️ **Piège classique** : `pcap_close` avant `pthread_join`. **Symptôme** : au
+CTRL+C, crash intermittent (`use-after-free` sous ASan, ou SIGSEGV nu), et le test
+`test_exit_code_zero_after_sigint` passe du vert au rouge **de façon aléatoire**
+selon le timing des deux threads.
+
+### 3.6 Lexique
+
+> **Norme — obligatoire.** Tout terme employé dans le document sans être redéfini
+> figure ici.
+
+| Terme | Ce qu'il désigne | Où ça vit |
+|---|---|---|
+| `handle` | le `pcap_t*` rendu par `pcap_open_live`, jeton de toute opération pcap | `t_sniffer.handle` |
+| datalink | type de couche liaison d'une interface (`DLT_EN10MB` = Ethernet) | `pcap_datalink()` |
+| filtre BPF | programme qui laisse passer certains paquets (`"tcp port 21"`) | `pcap_compile/setfilter` |
+| promiscuous | mode où la carte remonte **tout** le trafic vu, pas seulement le sien | `pcap_open_live` arg 3 |
+| `snaplen` | nombre max d'octets capturés par paquet (on prend 65535) | `pcap_open_live` arg 2 |
+| `caplen` | octets **réellement capturés** de ce paquet (borne sûre de lecture) | `pcap_pkthdr.caplen` |
+| `len` | taille du paquet **sur le fil** (peut dépasser `caplen`) | `pcap_pkthdr.len` |
+| payload | les octets FTP après les entêtes Eth+IP+TCP | calculé dans `ftp_handler` |
+| entêtes | `14 + ip_len + tcp_len`, l'offset du payload | calculé dans `ftp_handler` |
+| `ip_hl` / `doff` | longueur d'entête IP / TCP **en mots de 4 octets** (× 4 = octets) | `struct ip` / `struct tcphdr` |
+
 ---
 
-# MODULE A — Sniffing FTP + affichage des fichiers 🔴
+## 4. Module A — le corps, une section par fonction 🔴
 
-> **Objectif sujet :** « afficher en temps réel les noms des fichiers échangés
-> entre un client et un serveur FTP ». C'est le seul verrou du mandatory.
+> **Objectif sujet** : « afficher en temps réel les noms des fichiers échangés
+> entre un client et un serveur FTP ». Seul verrou du mandatory.
 
-> **État au 09/08 :** le **squelette d'interface** est posé — `include/sniffing.h`
-> déclare `t_sniffer` (handle `pcap_t*` + `pthread_t` + `verbose`) et les
-> prototypes `start_sniffer`, `capture_loop`, `ftp_handler`, `stop_sniffer`.
-> **Rien n'est implémenté** (`sniffing.c` = stub `test()`), rien n'est intégré à
-> `main`, et **certaines signatures sont à réconcilier** avant de coder (voir
-> A.2). Le reste de ce module reste donc entièrement à faire.
+**Ordre de dépendance** (on code de haut en bas) : la boîte à outils, puis
+`discover_interface` (delta), `start_sniffer`, `capture_loop`, `ftp_handler`,
+`stop_sniffer`, et enfin l'intégration dans `main`.
 
-## A.1 Concepts à maîtriser
+### 4.0 · Boîte à outils
 
-### libpcap — cycle de vie complet
-La chaîne d'appels obligatoire : **ouvrir → vérifier le datalink → compiler le
-filtre → appliquer → boucler → arrêter → fermer**. Chaque étape peut échouer et
-doit être testée.
-- `pcap_open_live(iface, snaplen, promisc, to_ms, errbuf)` — ouvre l'IF. On passe
-  `snaplen=65535` (capturer tout le paquet), `promisc=1` (**voir le trafic
-  relayé**, pas seulement le sien — indispensable en MITM), `to_ms=1000`. Renvoie
-  `NULL` + message dans `errbuf` en cas d'échec.
-- `pcap_datalink(handle)` — type de couche liaison. Ton parsing suppose de
-  l'Ethernet (offset 14) → **vérifier `== DLT_EN10MB`**, sinon les offsets sont
-  faux (ex. Linux « cooked », loopback…).
-- `pcap_loop(handle, -1, handler, user)` — boucle infinie (`-1`), appelle
-  `handler` à chaque paquet ; `user` est un pointeur passé **tel quel** au handler.
-- `pcap_breakloop` / `pcap_close` — arrêt (voir concept concurrence).
+Les accès API exacts, à écrire une fois et à référencer par lien depuis les
+sections d'algorithme.
 
-Docs (man, **une par fonction** — lis celles que tu appelles) :
-- Vue d'ensemble pcap(3) : https://www.tcpdump.org/manpages/pcap.3pcap.html
-- `pcap_open_live`(3), `pcap_datalink`(3), `pcap_loop`(3), `pcap_breakloop`(3),
-  `pcap_close`(3), `pcap_geterr`(3) — toutes sur `tcpdump.org/manpages/`.
-- **Le meilleur tuto pour débuter (lis-le en entier) :** « Programming with pcap »
-  — https://www.tcpdump.org/pcap.html
+| Opération | Appel exact | Notes |
+|---|---|---|
+| Ouvrir la capture | `pcap_open_live(iface, 65535, 1, 1000, errbuf)` | `iface` = **`char*`** ; rend `NULL` + `errbuf` si échec |
+| Vérifier Ethernet | `pcap_datalink(handle) == DLT_EN10MB` | sinon les offsets sont faux |
+| Compiler le filtre | `pcap_compile(handle, &fp, "tcp port 21", 1, PCAP_NETMASK_UNKNOWN)` | rend `-1` → `pcap_geterr(handle)` |
+| Appliquer le filtre | `pcap_setfilter(handle, &fp)` | rend `-1` → `pcap_geterr(handle)` |
+| Libérer le bytecode | `pcap_freecode(&fp)` | **après** setfilter, succès **comme** échec |
+| Boucler | `pcap_loop(handle, -1, ftp_handler, user)` | `-1` = infini ; `user` passé tel quel |
+| Arrêter la boucle | `pcap_breakloop(handle)` | fait sortir `pcap_loop` |
+| Fermer | `pcap_close(handle)` | **après** `pthread_join` uniquement |
+| Lancer le thread | `pthread_create(&s->thread, NULL, capture_loop, s)` | rend `0` si ok |
+| Attendre le thread | `pthread_join(s->thread, NULL)` | avant `pcap_close` |
+| Chercher un `\n` | `memchr(base, '\n', reste)` | rend `absent` si aucun |
+| Comparer préfixe insensible casse | `strncasecmp(ligne, "STOR ", 5)` | `0` = égal |
 
-> Analogie : un micro branché sur le câble ; le filtre ne laisse passer que « la
-> fréquence 21 ».
-> Piège : oublier le promiscuous (`promisc=1`) → affichage FTP vide alors que le
-> MITM marche.
+**Structs système** (champs réels, headers à inclure) :
 
-### Filtre BPF (`pcap_compile` + `pcap_setfilter`)
-`pcap_compile(handle, &fp, "tcp port 21", 1, PCAP_NETMASK_UNKNOWN)` **traduit** la
-chaîne en bytecode (`struct bpf_program fp`) ; `pcap_setfilter(handle, &fp)`
-**l'installe** ; `pcap_freecode(&fp)` le libère une fois posé. Les deux renvoient
-`-1` en cas d'échec → afficher `pcap_geterr(handle)`.
-- Syntaxe des filtres : https://www.tcpdump.org/manpages/pcap-filter.7.html
-- `pcap_compile`(3), `pcap_setfilter`(3), `pcap_freecode`(3) sur tcpdump.org.
+| Struct | Header | Champs utilisés |
+|---|---|---|
+| `struct ether_header` | `<net/ethernet.h>` | `ether_type` (tester `ntohs(...) == ETHERTYPE_IP`) |
+| `struct ip` | `<netinet/ip.h>` | `ip_hl` (× 4 = octets), `ip_p` (tester `== IPPROTO_TCP`) |
+| `struct tcphdr` | `<netinet/tcp.h>` | `doff` (× 4 = octets) — nom Linux, **pas** `th_off` |
 
-### En-têtes Ethernet → IP → TCP → payload (offsets + structs exactes)
-Tu « descends » les couches en ajoutant des offsets **calculés** (jamais en dur) :
-- `struct ether_header` (`<net/ethernet.h>`) — 14 octets fixes. Champ
-  `ether_type` : ne continuer que si `ntohs(ether_type) == ETHERTYPE_IP` (0x0800).
-- `struct ip` (`<netinet/ip.h>`) — `ip_hl` = longueur de l'en-tête IP **en mots de
-  4 octets** → longueur réelle = `ip_hl * 4` (≥ 20). Champ `ip_p` : ne continuer
-  que si `== IPPROTO_TCP` (6).
-- `struct tcphdr` (`<netinet/tcp.h>`) — `doff` (data offset) = longueur de l'en-tête
-  TCP **en mots de 4 octets** → `doff * 4` (≥ 20).
-- payload FTP = `paquet + 14 + ip_len + tcp_len` ; sa taille =
-  `caplen − 14 − ip_len − tcp_len`.
+> [!CAUTION]
+> **`struct tcphdr` : utiliser `doff`, pas `th_off`.** Les noms BSD (`th_off`,
+> `th_*`) n'existent que si `__FAVOR_BSD` est défini. Sur la glibc par défaut,
+> seul `doff` compile. Idem `struct ip` (`ip_hl`) vs `struct iphdr` (`ihl`) :
+> choisir `struct ip`/`ip_hl` et inclure `<netinet/ip.h>`.
 
-> Piège n°1 : coder `+14+20+20` en dur — les options IP/TCP changent la taille, on
-> lit alors à côté. Recalcule via `ip_hl` / `doff`.
-> Piège n°2 (glibc) : les noms BSD `th_off`/`th_*` de `struct tcphdr` n'existent
-> que si `__FAVOR_BSD` est défini ; par défaut utilise **`doff`**. Idem `struct ip`
-> (BSD, champ `ip_hl`) vs `struct iphdr` (Linux, champ `ihl`) — choisis-en une et
-> inclus le bon header.
-> Piège n°3 : borne tes lectures avec `header->caplen` (octets réellement
-> capturés), **pas** `header->len` (taille sur le fil, potentiellement plus grande).
+### 4.1 · discover_interface (delta : stocker l'interface)
 
-### Protocole FTP (RFC 959, port 21, texte clair)
-Le canal de contrôle (port 21) transporte des commandes **texte, une par ligne**,
-terminées par `\r\n`. Mandatory : `STOR <fichier>` (upload) et `RETR <fichier>`
-(download) → afficher le nom. Casse indifférente. Un même segment TCP peut contenir
-0, 1 ou **plusieurs** lignes (ou une ligne coupée) → itérer, rester tolérant.
-- RFC 959, §4 (commandes) & §5 : https://www.rfc-editor.org/rfc/rfc959
-- (bonus `-v`) le login `USER`/`PASS` passe par les mêmes lignes texte.
+**Ce qu'elle doit accomplir.** Elle découvre déjà IP/MAC/index locaux. Il manque
+une chose : **conserver le nom** de l'interface (`tmp->ifa_name`) pour que
+`start_sniffer` sache quoi ouvrir. Aujourd'hui `ifa_name` sert au `ioctl` puis est
+perdu.
 
-### Concurrence sniffer ↔ poison (pthreads)
-`pcap_loop` **bloque** → il tourne dans un **thread dédié** (le Makefile lie déjà
-`-pthread`) pendant que `main` empoisonne en boucle. Ordre d'arrêt **impératif** :
-`pcap_breakloop` (fait sortir `pcap_loop`) → `pthread_join` (attend la fin du
-thread) → `pcap_close` (libère le handle).
-- `man 3 pthread_create`, `man 3 pthread_join`.
-> Piège : `pcap_close` pendant que le thread est encore dans `pcap_loop` → crash /
-> use-after-free. Toujours `breakloop` puis `join` **avant** `close`.
-> `verbose` partagé en lecture seule entre threads = OK ; ne partage rien d'écrit
-> sans protection.
+**Décisions**
 
-### Docs à lire, dans l'ordre (pour avoir les clés en main)
-1. **« Programming with pcap »** (tuto fondateur, en entier) — https://www.tcpdump.org/pcap.html
-2. pcap(3), puis le man de **chaque** fonction que tu appelles (open_live, datalink,
-   compile, setfilter, freecode, loop, breakloop, close, geterr).
-3. **pcap-filter(7)** pour comprendre `tcp port 21`.
-4. **RFC 959 §4–5** pour `STOR`/`RETR` (et `USER`/`PASS` pour le bonus).
-5. `man 3 pthread_create` / `pthread_join`.
-6. Les structs directement dans les headers système :
-   `/usr/include/net/ethernet.h`, `/usr/include/netinet/ip.h`,
-   `/usr/include/netinet/tcp.h` (lis les champs, ça vaut tous les tutos).
+| Décision | Pourquoi |
+|---|---|
+| `iface` typé `char *` (pas `char`) | il faut stocker une chaîne (`"eth0"`), pas un octet ; voir piège § 5 |
+| `ft_strdup` de `ifa_name` | `interface` est libéré par `freeifaddrs` avant le retour — garder un pointeur dessus serait un dangling |
 
-## A.2 Étapes
+**🧭 Quoi utiliser, et pourquoi**
 
-1. **`include/sniffing.h` — squelette posé, à réconcilier** ✅⚠️ : la struct
-   `t_sniffer` et les prototypes existent déjà. **Corrections à faire avant
-   d'implémenter :**
-   - passer `t_sniffer *` (pointeur) à `capture_loop`/`stop_sniffer` plutôt que
-     par valeur — sinon on manipule une copie du `pcap_t*`/`pthread_t` ;
-   - donner à `ftp_handler` la signature imposée par `pcap_loop` :
-     `void ftp_handler(u_char *user, const struct pcap_pkthdr *h, const u_char *pkt)`.
-2. **Stocker l'interface** dans `t_config` (❌ pas encore fait) :
-   `discover_interface` connaît déjà `ifa_name` (variable `tmp->ifa_name`) mais ne
-   le garde pas → ajouter `char *iface;` à `t_config`, le `ft_strdup`, et le
-   libérer dans `free_ressources`.
-3. **Ouvrir la capture** : `pcap_open_live(iface, 65535, 1, 1000, errbuf)`,
-   compiler + appliquer `tcp port 21`.
-4. **Handler** : sauter Ethernet/IP/TCP via `ip_hl`/`th_off`, isoler le payload.
-5. **Parser mandatory** : lignes `STOR `/`RETR ` (insensible casse) → nom →
-   `printf("[FTP] STOR %s\n")`.
-6. **Threader** : lancer `pcap_loop` dans un `pthread` avant la boucle de poison.
-7. **Arrêt propre** : `stop_sniffer` = `breakloop` → `join` → `close`, appelé
-   avant `restore_arp`.
+| Ce que dit le pseudo-code | Où trouver comment |
+|---|---|
+| `remember the interface name` | `ft_strdup(tmp->ifa_name)` ; le libérer dans `free_ressources` |
 
-## A.3 Prototypes (C)
-
-> Contrat d'interface uniquement (structs + signatures). C'est la **cible** à
-> viser : elle corrige les signatures actuelles de `sniffing.h` (passage par
-> pointeur, `ftp_handler` conforme à `pcap_loop`) et ajoute `iface` à `t_config`.
+**Prototype** — inchangé, seul le corps gagne une ligne :
 
 ```c
-/* inquisitor.h — ajout au t_config existant */
-typedef struct s_config {
-    /* ... champs existants ... */
-    char *iface;      /* nom de l'IF découverte (ft_strdup, libéré au cleanup) */
-    int   verbose;    /* 0 = mandatory (STOR/RETR), 1 = verbose -v (bonus)     */
-} t_config;
-
-/* sniffing.h */
-typedef struct s_sniffer {
-    pcap_t    *handle;
-    pthread_t  thread;
-    int        verbose;
-} t_sniffer;
-
-int   start_sniffer(t_sniffer *s, t_config *config);
-void *capture_loop(void *arg);   /* thread : (t_sniffer *) -> pcap_loop        */
-void  ftp_handler(u_char *user,
-                  const struct pcap_pkthdr *header,
-                  const u_char *packet);      /* prototype imposé par pcap_loop */
-void  stop_sniffer(t_sniffer *s);            /* breakloop -> join -> close      */
+int discover_interface(t_config *config);   /* + config->iface = ft_strdup(ifa_name) */
 ```
 
-> Note : `capture_loop` respecte la signature `void *(*)(void *)` attendue par
-> `pthread_create` ; `ftp_handler` respecte celle attendue par `pcap_loop`. Les
-> deux structs et `t_config` sont passés **par pointeur** pour éviter de
-> travailler sur une copie du `pcap_t*` / `pthread_t`.
-
-## A.4 Pseudo-code (logique) — détaillé
-
-> Chaque appel pcap peut échouer : on teste **tous** les retours. Les noms de
-> champs ci-dessous sont ceux des **vraies** structs système (voir A.1 / A.3).
+**Corps** (delta seulement) :
 
 ```
-// ─── start_sniffer : ouvrir, vérifier, filtrer, lancer le thread ───
-FONCTION start_sniffer(s, config) -> int (0 = ok, -1 = erreur) :
-    char errbuf[PCAP_ERRBUF_SIZE]
+// inside the AF_INET branch, right after local_ip is set:
+config.iface = duplicate the interface name   // survives freeifaddrs   → §4.0
+```
+
+⚠️ Ajouter le `free(config->iface)` correspondant dans `free_ressources`, sinon
+fuite à chaque exécution.
+
+### 4.2 · start_sniffer
+
+**Ce qu'elle doit accomplir.** Ouvrir la capture sur l'interface, vérifier que
+c'est de l'Ethernet, installer le filtre `tcp port 21`, puis lancer `capture_loop`
+dans un thread. Elle rend `0` si tout est prêt, `-1` sinon.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| Rendre `-1` plutôt qu'appeler `error()` | `error()` fait `exit()` **sans** restaurer les tables ARP → victimes laissées empoisonnées. Le sniffer doit rendre la main à `main`, qui décidera (voir piège § 5) |
+| Travailler sur une variable locale `handle`, l'affecter à `s->handle` **en dernier** | tant que l'ouverture n'a pas réussi, `s->handle` doit rester `NULL` pour que `stop_sniffer` sache qu'il n'y a rien à fermer |
+| `pcap_freecode(&fp)` sur **tous** les chemins après compile | le bytecode est inutile dès qu'il est posé ; l'oublier fuit à chaque lancement |
+
+⚠️ **Piège** : appeler `pcap_datalink`/`pcap_compile` sur `s->handle` alors que
+`s->handle` n'est pas encore affecté (il vaut encore `NULL`/garbage). **Symptôme** :
+`pcap_datalink(NULL)` → segfault immédiat au démarrage. Utiliser la locale
+`handle` partout, n'écrire `s->handle = handle` qu'à la toute fin.
+
+**🧭 Quoi utiliser, et pourquoi**
+
+| Ce que dit le pseudo-code | Où trouver comment |
+|---|---|
+| `open ... promiscuous` | `pcap_open_live`, → §4.0. Le `1` en 3ᵉ arg **est** le promiscuous — le crux du concept § 3.1 |
+| `if link type is not Ethernet` | `pcap_datalink(handle) != DLT_EN10MB`, → §4.0 |
+| `compile / install / free filter` | trio `pcap_compile` / `pcap_setfilter` / `pcap_freecode`, → §4.0 |
+| `start the capture thread` | `pthread_create(..., capture_loop, s)`, → §4.0 |
+
+**Lignes de log** (littérales — chemins d'erreur) :
+
+```c
+fprintf(stderr, "start_sniffer: %s\n", errbuf);            // ① open failed
+fprintf(stderr, "start_sniffer: non-Ethernet interface\n"); // ② wrong datalink
+fprintf(stderr, "start_sniffer: %s\n", pcap_geterr(handle)); // ③ compile/filter failed
+```
+
+**Prototype**
+
+```c
+int start_sniffer(t_sniffer *s, t_config *config);
+```
+
+**Corps**
+
+```
+start_sniffer(s : t_sniffer*, config : t_config*) -> int:            // 0 ok, -1 error
+    errbuf : char[PCAP_ERRBUF_SIZE]
     s.verbose = config.verbose
-    s.handle  = pcap_open_live(config.iface, 65535, 1 /*promisc*/, 1000, errbuf)
-    SI s.handle == NULL : afficher errbuf ; RETOURNER -1
+    s.handle  = absent                                    // nothing to close yet
 
-    // le parsing suppose de l'Ethernet (offset 14) -> le vérifier
-    SI pcap_datalink(s.handle) != DLT_EN10MB :
-        afficher "interface non-Ethernet" ; pcap_close(s.handle) ; RETOURNER -1
+    handle : pcap_t* = open config.iface, promiscuous, snaplen 65535, 1000 ms   → §4.0
+    if handle is absent:
+        return -1                                                       log ①
 
-    struct bpf_program fp
-    SI pcap_compile(s.handle, &fp, "tcp port 21", 1, PCAP_NETMASK_UNKNOWN) == -1 :
-        afficher pcap_geterr(s.handle) ; pcap_close(s.handle) ; RETOURNER -1
-    SI pcap_setfilter(s.handle, &fp) == -1 :
-        afficher pcap_geterr(s.handle) ; pcap_freecode(&fp) ; pcap_close(s.handle) ; RETOURNER -1
-    pcap_freecode(&fp)                       // bytecode inutile une fois posé
+    if link-layer type of handle is not Ethernet:                       → §4.0
+        close handle
+        return -1                                                       log ②
 
-    SI pthread_create(&s.thread, NULL, capture_loop, s) != 0 :
-        afficher "pthread_create" ; pcap_close(s.handle) ; RETOURNER -1
-    RETOURNER 0
+    fp : bpf_program
+    if compiling "tcp port 21" into fp fails:                           → §4.0
+        close handle
+        return -1                                                       log ③
+    if installing fp on handle fails:                                   → §4.0
+        free fp ; close handle
+        return -1                                                       log ③
+    free fp                                                 // done, whether or not it succeeded
 
-// ─── capture_loop : exécuté DANS le thread ───
-FONCTION capture_loop(arg) -> void* :
-    s = (t_sniffer*) arg
-    pcap_loop(s.handle, -1, ftp_handler, (u_char*) s)   // bloque jusqu'au breakloop
-    RETOURNER NULL
+    s.handle = handle                                      // NOW it is safe to publish
+    if creating the capture thread fails:                               → §4.0
+        close handle ; s.handle = absent
+        return -1
 
-// ─── ftp_handler : appelé une fois par paquet ───
-FONCTION ftp_handler(user, header, packet) :
-    s   = (t_sniffer*) user
-    len = header.caplen                      // borne SÛRE (octets réellement capturés)
-
-    // (1) gardes-fous de taille AVANT tout déréférencement
-    SI len < 14 + 20 + 20 : RETOURNER        // au minimum Eth + IP min + TCP min
-    eth = (struct ether_header*) packet
-    SI ntohs(eth.ether_type) != ETHERTYPE_IP : RETOURNER
-
-    ip     = (struct ip*) (packet + 14)
-    ip_len = ip.ip_hl * 4                     // ip_hl = mots de 4 octets
-    SI ip_len < 20 OU ip.ip_p != IPPROTO_TCP : RETOURNER
-
-    tcp     = (struct tcphdr*) (packet + 14 + ip_len)
-    tcp_len = tcp.doff * 4                     // doff = mots de 4 octets (nom Linux)
-    SI tcp_len < 20 : RETOURNER
-
-    entetes = 14 + ip_len + tcp_len
-    SI len <= entetes : RETOURNER             // pas de payload (ACK pur, etc.)
-    payload     = packet + entetes
-    payload_len = len - entetes
-
-    // (2) le payload N'EST PAS terminé par \0 -> itérer avec la longueur
-    //     (memchr pour '\n'), jamais de strlen/strstr direct dessus.
-    POUR CHAQUE ligne DANS payload[0 .. payload_len] séparée par '\n' :
-        retirer le '\r' final éventuel
-        SI ligne vide : CONTINUER
-        SI s.verbose :                        // bonus -v : tout le trafic
-            afficher "[FTP] " + ligne
-        SINON SI ligne commence (insensible casse) par "STOR " OU "RETR " :
-            cmd = les 4 premières lettres (en majuscules)
-            nom = la ligne après le premier espace
-            afficher "[FTP] " + cmd + " " + nom
-
-// ─── stop_sniffer : ORDRE IMPÉRATIF ───
-FONCTION stop_sniffer(s) :
-    SI s.handle == NULL : RETOURNER
-    pcap_breakloop(s.handle)                  // 1. fait sortir pcap_loop
-    pthread_join(s.thread, NULL)              // 2. attend la fin du thread
-    pcap_close(s.handle)                      // 3. libère le handle
-    s.handle = NULL
+    return 0
 ```
 
-Intégration dans `main` (ordre exact) :
+### 4.3 · capture_loop
+
+**Ce qu'elle doit accomplir.** C'est le corps du thread. Elle ne fait qu'une
+chose : lancer `pcap_loop`, qui bloque jusqu'à ce que `stop_sniffer` appelle
+`breakloop`. Sa signature suit `void *(*)(void *)` (contrat de `pthread_create`).
+
+**Prototype**
+
+```c
+void *capture_loop(void *arg);   /* thread entry: (t_sniffer *) */
+```
+
+**Corps**
+
+```
+capture_loop(arg : void*) -> void*:
+    s : t_sniffer* = arg
+    loop over packets of s.handle forever, calling ftp_handler with s   → §4.0
+    return absent
+```
+
+### 4.4 · ftp_handler
+
+**Ce qu'elle doit accomplir.** Appelée **une fois par paquet** par `pcap_loop`.
+Elle descend Eth → IP → TCP par offsets calculés, isole le payload, le découpe en
+lignes, et pour chaque `STOR`/`RETR` affiche le nom de fichier. La signature est
+**imposée** par `pcap_loop`.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| Borner sur `header.caplen`, pas `header.len` | `len` est la taille sur le fil ; lire jusque-là sort du buffer si le paquet a été tronqué au `snaplen` |
+| Un garde-fou de taille **avant chaque** déréférencement | un paquet trop court déréférencerait au-delà du buffer → crash ou lecture de mémoire voisine |
+| Itérer avec `memchr('\n')`, jamais `strstr`/`%s` nu | le payload n'a pas de `\0` (concept § 3.3) |
+| `strncasecmp` pour le préfixe | la casse FTP est indifférente (concept § 3.4) |
+
+⚠️ **Pièges** (chacun avec son symptôme) :
+
+- `ip_hl * 4` / `doff * 4` oubliés → payload décalé, **noms préfixés de parasites**
+  seulement sur les paquets à options (§ 3.2).
+- `printf("%s", payload)` → **octets aléatoires** après le nom, ou ASan
+  `heap-buffer-overflow` (§ 3.3). Utiliser `printf("%.*s", (int)n, ligne)`.
+- Ne pas re-tester `len <= entetes` → un **ACK pur** (payload vide) fait lire une
+  ligne fantôme.
+
+**🧭 Quoi utiliser, et pourquoi**
+
+| Ce que dit le pseudo-code | Où trouver comment |
+|---|---|
+| `ether_type is IPv4` | `ntohs(eth.ether_type) == ETHERTYPE_IP`, → §4.0. **`ntohs`, pas `stohs`** (voir § 5) |
+| `ip header length in bytes` | `ip.ip_hl * 4`, → §4.0 |
+| `tcp header length in bytes` | `tcp.doff * 4`, → §4.0 |
+| `next line` | `memchr(cur, '\n', end - cur)`, → §4.0 |
+| `line starts with STOR/RETR` | `strncasecmp(line, "STOR ", 5) == 0`, → §4.0 |
+
+**Lignes de log** (littérales — ce que les tests du Module B grep) :
+
+```c
+printf("[FTP] STOR %.*s\n", (int)name_len, name);   // mandatory
+printf("[FTP] RETR %.*s\n", (int)name_len, name);   // mandatory
+printf("[FTP] %.*s\n",      (int)line_len, line);    // verbose -v (module E)
+fflush(stdout);                                       // stdout is a PIPE in tests → flush
+```
+
+> [!IMPORTANT]
+> **`fflush(stdout)` après chaque ligne.** En test (Module B), `inquisitor` tourne
+> avec `stdout` redirigé vers un `PIPE` : la libc bufferise alors par blocs, pas
+> par lignes, et le test qui lit « en flux » ne voit **jamais** la ligne → échoue
+> sur un timeout alors que le code est correct.
+
+**Prototype** (imposé par `pcap_loop`) :
+
+```c
+void ftp_handler(u_char *user,
+                 const struct pcap_pkthdr *header,
+                 const u_char *packet);
+```
+
+**Corps**
+
+```
+ftp_handler(user : u_char*, header : pcap_pkthdr*, packet : u_char*):
+    s   : t_sniffer* = user
+    len : uint       = header.caplen                  // SAFE bound (really captured)
+
+    // (1) size guards BEFORE any dereference
+    if len < 14 + 20 + 20:                            // Eth + min IP + min TCP
+        return
+
+    eth : ether_header* = packet
+    if ether_type of eth is not IPv4:                                   → §4.0
+        return
+
+    ip     : ip* = packet + 14
+    ip_len : uint = ip.ip_hl * 4                       // words of 4 bytes
+    if ip_len < 20 or ip.ip_p is not TCP:                               → §4.0
+        return
+
+    tcp     : tcphdr* = packet + 14 + ip_len
+    tcp_len : uint = tcp.doff * 4                       // words of 4 bytes (Linux name)
+    if tcp_len < 20:
+        return
+
+    headers : uint = 14 + ip_len + tcp_len
+    if len <= headers:                                 // pure ACK, no payload
+        return
+    payload     : u_char* = packet + headers
+    payload_len : uint    = len - headers
+
+    // (2) payload is NOT NUL-terminated: walk it by length
+    cur : u_char* = payload
+    end : u_char* = payload + payload_len
+    while cur < end:
+        nl : u_char* = next '\n' in [cur, end)                          → §4.0
+        line_end : u_char* = nl if nl is set else end
+        line_len : uint = line_end - cur
+        if line_len > 0 and byte before line_end is '\r':
+            line_len = line_len - 1                     // drop trailing CR
+        if line_len == 0:
+            cur = line_end + 1 ; continue
+        if s.verbose:                                   // module E: everything
+            print "[FTP] " + line[0..line_len]                          log verbose
+        else if line[0..line_len] starts with "STOR " or "RETR " (case-insensitive):
+            cmd  : text = first 4 letters, uppercased
+            name : slice = line after the first space, up to line_len
+            print "[FTP] " + cmd + " " + name                           log STOR/RETR
+        if nl is absent:
+            break                                       // last (maybe partial) line
+        cur = nl + 1
+```
+
+### 4.5 · stop_sniffer
+
+**Ce qu'elle doit accomplir.** Arrêter le thread et libérer le handle, dans
+l'**ordre impératif** `breakloop → join → close`. Idempotente : si `s->handle`
+est déjà `absent`, elle ne fait rien.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| Garder l'ordre `breakloop → join → close` | fermer un handle qu'un thread lit encore = use-after-free (§ 3.5) |
+| Mettre `s->handle = absent` après `close` | rend un double appel sans danger |
+
+⚠️ **Piège** : c'est la fonction **actuellement en commentaire** dans
+`sniffing.c`. Tant qu'elle manque, le CTRL+C laisse le thread dans `pcap_loop` et
+le process ne se termine pas proprement → `test_exit_code_zero_after_sigint` casse.
+
+**Prototype**
+
+```c
+void stop_sniffer(t_sniffer *s);
+```
+
+**Corps**
+
+```
+stop_sniffer(s : t_sniffer*):
+    if s.handle is absent:
+        return
+    break the capture loop of s.handle          // 1. makes pcap_loop return   → §4.0
+    join s.thread                                // 2. wait for the thread       → §4.0
+    close s.handle                               // 3. release the handle        → §4.0
+    s.handle = absent
+```
+
+### 4.6 · Intégration dans `main` (ordre exact)
 
 ```
 setup_signals() ; parse_arguments() ; print_config()
+discover_interface()                    // now fills config.iface
 build_arp_trame() x2 ; fd = open_inject_socket()
-t_sniffer s ;
-SI start_sniffer(&s, &config) != 0 : error(...)   // AVANT la boucle de poison
-TANT QUE g_running : send in ; send out ; sleep
-stop_sniffer(&s)                                    // AVANT restore_arp
+
+s : t_sniffer = {0}
+if start_sniffer(&s, &config) != 0:     // BEFORE the poison loop
+    restore nothing yet, just cleanup and leave // sniffer never started
+    close(fd) ; free_ressources() ; return 1
+
+while g_running:
+    send in ; send out ; sleep
+
+stop_sniffer(&s)                         // BEFORE restore_arp (§ 3.5 order)
 restore_arp() ; close(fd) ; free_ressources()
 ```
 
-## A.5 Pièges spécifiques
-- Promiscuous obligatoire (sinon affichage vide).
-- Offsets `ip_hl`/`th_off` = valeur × 4, jamais en dur.
-- Ordre d'arrêt `breakloop → join → close` (sinon crash au CTRL+C → casse
-  `test_exit_code_zero_after_sigint`).
-- Réutiliser l'interface découverte (pas `eth0` en dur).
-- `ip_forward` doit rester à 1 (déjà réglé) sinon le FTP se coupe.
-
-## A.6 Test manuel de validation
-```sh
-make up
-make run                                   # terminal 1
-docker compose exec client lftp -u test,1234 \
-  -e "put /etc/hostname -o up.txt; bye" 192.168.0.2   # terminal 2
-# attendu terminal 1 : [FTP] STOR up.txt
-```
-
-> **Module A clos quand** `[FTP] STOR/RETR <fichier>` s'affiche en direct et que
-> l'arrêt CTRL+C reste propre (exit 0).
+> [!CAUTION]
+> **Si `start_sniffer` échoue, ne pas empoisonner.** On n'a encore rien envoyé,
+> donc rien à restaurer. En revanche, si l'échec survient **après** le début du
+> poison, il faut `restore_arp` avant de sortir — d'où l'importance de démarrer le
+> sniffer **avant** la boucle.
 
 ---
+
+## 5. Pièges spécifiques à cette phase
+
+Ceux qui n'appartiennent à aucun concept seul — dont les **bugs déjà présents**
+dans `sniffing.c`/`inquisitor.h` au 11/08, à corriger avant tout :
+
+| Bug actuel | Symptôme | Correction |
+|---|---|---|
+| `t_config.iface` typé **`char`** | `pcap_open_live(&config->iface, …)` passe l'adresse d'un octet, pas une chaîne → interface introuvable / ouverture d'un mauvais device | `char *iface;` + `ft_strdup(ifa_name)` (§ 4.1) |
+| `discover_interface` ne stocke pas `ifa_name` | `iface` reste vide même une fois typé `char*` | ajouter la ligne du § 4.1 |
+| `stohs(eth->ether_type)` | **ne compile pas** (`stohs` n'existe pas) | `ntohs` |
+| `pcap_datalink/compile/setfilter` sur `s->handle` non affecté | segfault au démarrage (`s->handle` vaut garbage) | travailler sur la locale `handle`, publier `s->handle` en dernier (§ 4.2) |
+| casts manquants (`eth = packet`, `ip = packet+14`) | warning/erreur `-Werror` | caster `(struct ether_header *)`, `(struct ip *)` |
+| `pcap_freecode(&fp)` absent sur le chemin succès | petite fuite à chaque lancement | libérer après `setfilter`, succès comme échec |
+| `stop_sniffer` en commentaire | CTRL+C ne termine pas proprement → `test_exit_code_zero_after_sigint` rouge | l'implémenter (§ 4.5) et l'appeler dans `main` |
+| sniffer appelle `error()` (→ `exit`) | échec sniffer = process tué **avant** `restore_arp` → victimes laissées empoisonnées | rendre `-1`, laisser `main` décider (§ 4.2) |
+
+Pièges transverses (non-bugs, à ne pas introduire) :
+- Promiscuous obligatoire (§ 3.1) — sinon affichage vide.
+- `ip_forward` doit rester à 1 (déjà réglé dans le lab) sinon le FTP se coupe.
+- Réutiliser l'interface découverte, jamais `eth0` en dur.
+
 ---
 
-# MODULE B — Tests FTP 🔴
+## 6. Modules B, C, E — le reste
 
-> **Objectif sujet :** « La démonstration se fait via le protocole FTP. Une suite
-> de tests spécifique à ce protocole est donc requise. » → nouveau fichier
-> `tests/test_ftp.py`.
+### 6.1 Module B — Tests FTP 🔴
 
-## B.1 Ce qu'on teste
+> **Objectif sujet** : « La démonstration se fait via le protocole FTP. Une suite
+> de tests spécifique à ce protocole est donc requise. » → `tests/test_ftp.py`.
+
+**Ce que tu testes :**
 - Un `put` client → serveur fait apparaître `[FTP] STOR <fichier>` sur le stdout
-  de `inquisitor`.
+  d'`inquisitor`.
 - Un `get` fait apparaître `[FTP] RETR <fichier>`.
-- Les tests ARP existants **restent verts** (l'ajout du sniffer ne change pas le
-  code de sortie 0).
 
-## B.2 Stratégie
-Lancer `inquisitor` avec `stdout=PIPE` (réutiliser les helpers de
+**Ce que le test doit prouver au-delà du comportement :** que l'ajout du sniffer
+**ne casse pas** l'arrêt propre — d'où l'insistance sur `test_exit_code_zero_after_sigint`
+qui doit rester vert. Un sniffer qui affiche bien mais crashe au CTRL+C ne passe
+pas le sujet.
+
+**Stratégie :** lancer `inquisitor` avec `stdout=PIPE` (variante des helpers de
 `test_poisoning.py` : `flush_arp_caches`, `populate_arp_caches`, `stop_inquisitor`),
-déclencher un transfert `lftp` depuis le conteneur `client`, lire le stdout
-capturé, chercher la ligne attendue.
+déclencher un transfert `lftp` depuis le conteneur `client`, lire le stdout **en
+flux** (le process tourne toujours), chercher la ligne attendue.
 
-## B.3 Pseudo-code (`tests/test_ftp.py`)
 ```python
 @unittest.skipUnless(lab_is_up(), "Docker lab is not running")
 class TestFTPSniffing(unittest.TestCase):
     def setUp(self):
         flush_arp_caches(); populate_arp_caches()
-        # variante de start_inquisitor() avec stdout=subprocess.PIPE
-        self.proc = start_inquisitor_capturing_stdout()
-        time.sleep(3)                        # poison en place
+        self.proc = start_inquisitor_capturing_stdout()   # stdout=subprocess.PIPE
+        time.sleep(3)                                      # poison in place
 
-    def _lftp(self, script):
+    def _lftp(self, script):                               # comment in English (code)
         compose_exec("client",
-            ["lftp","-u","test,1234","-e",script,"192.168.0.2"], timeout=10)
+            ["lftp", "-u", "test,1234", "-e", script, "192.168.0.2"], timeout=10)
 
     def test_stor_filename_displayed(self):
         self._lftp("put /etc/hostname -o up.txt; bye")
@@ -353,168 +616,141 @@ class TestFTPSniffing(unittest.TestCase):
         stop_inquisitor(self.proc)
 ```
 
-## B.4 Pré-requis / pièges
-- Le fichier `data/hello.txt` doit exister côté serveur pour tester le `RETR`
-  (le README le mentionne ; le créer si absent).
-- Lire le stdout **en flux** (le process tourne toujours) : ne pas faire
-  `proc.communicate()` qui bloque — lire ligne à ligne avec un timeout.
-- Garder `test_exit_code_zero_after_sigint` (dans `test_poisoning.py`) vert :
-  régression directe si l'arrêt du thread sniffer casse le code 0.
+> [!CAUTION]
+> **Ne pas faire `proc.communicate()`** : il attend la fin du process, or
+> `inquisitor` tourne jusqu'au CTRL+C → blocage jusqu'au timeout. Lire ligne à
+> ligne avec un timeout (`read_stdout_until`).
 
-## B.5 Résultats attendus
+**Pré-requis :** `data/hello.txt` doit exister côté serveur pour le `RETR` (le
+créer s'il manque). Dépend de `fflush(stdout)` côté C (§ 4.4).
+
+**Résultats attendus :**
 - `test_stor_filename_displayed` : PASS
 - `test_retr_filename_displayed` : PASS
-- suite ARP (`test_poisoning.py`) : inchangée, PASS
+- Suite ARP (`test_poisoning.py`), dont `test_exit_code_zero_after_sigint` :
+  inchangée, PASS.
 
----
----
+### 6.2 Module C — Robustesse 🟠
 
-# MODULE C — Robustesse 🟠
+Aucune fonctionnalité nouvelle, uniquement de la fiabilité (défauts repérés au
+Doc 2).
 
-> **Objectif :** corriger les défauts repérés dans le code existant (voir Doc 2).
-> Aucune nouvelle fonctionnalité, uniquement de la fiabilité.
+| # | Où | Correction |
+|---|---|---|
+| C.1 | `discover_interface` (`parsing.c`) | libérer `local_ip` sur chaque `return -1` postérieur à son allocation (ou label `goto cleanup`) |
+| C.2 | `build_arp_trame` (`poisoning.c`) | `config` passé par valeur → `error(&config)` libère des pointeurs partagés avec `main`. Passer `t_config*`, ou documenter que `error()` termine le process |
+| C.3 | boucle / `restore_arp` (`main.c`) | `sleep(1)` rend le CTRL+C lent → `nanosleep` en petites tranches qui teste `g_running` |
+| C.4 | `poisoning.c` | `struct sockaddr_ll sockadr = {0}` et `memset(frame, 0, sizeof(*frame))` (défensif) |
+| C.5 | `parsing.c` | supprimer les tests morts `converted_value < 0` (≈ l.112, 143) ; commenter la convention `return 1 = invalide / 0 = valide` |
 
-## C.1 Fuite mémoire dans `discover_interface` (`src/parsing.c`)
-Sur le chemin d'erreur entre `ft_strdup(local_ip)` et la fin, `local_ip` alloué
-n'est pas libéré si un `ioctl` échoue.
-```
-Correction : avant chaque `return (-1)` postérieur à l'allocation de local_ip,
-             free(config->local_ip); config->local_ip = NULL;
-   (ou centraliser via un label goto cleanup).
-```
-
-## C.2 `config` copie vs original dans `build_arp_trame` (`src/poisoning.c`)
-`build_arp_trame(t_arp_frame*, t_config config)` reçoit `config` **par valeur** ;
-`error(&config)` libère `local_ip/local_mac` du **copie** (mêmes pointeurs que le
-`main`). Sans danger tant que `error()` fait `exit()`, mais fragile.
-```
-Correction (au choix) :
-  - passer t_config* (pointeur) à build_arp_trame pour lever l'ambiguïté, OU
-  - documenter clairement par un commentaire que error() termine le process.
-```
-
-## C.3 CTRL+C peu réactif (`src/main.c`, `restore_arp`)
-`sleep(1)` dans la boucle → jusqu'à 1 s pour sortir, puis 5 s de restore.
-```
-Correction : remplacer sleep(1) par une attente interruptible
-  (nanosleep en petites tranches qui teste g_running, ou intervalle plus court).
-Le restore peut aussi passer à un intervalle < 1 s pour accélérer la soutenance.
-```
-
-## C.4 Initialisation des structures (`src/poisoning.c`)
-`send_arp_frame` remplit `struct sockaddr_ll sockadr` partiellement ;
-`build_arp_trame` n'initialise pas la trame.
-```
-Correction : struct sockaddr_ll sockadr = {0};  et  memset(frame, 0, sizeof(*frame));
-             (défensif si les structs évoluent)
-```
-
-## C.5 Code mort (`src/parsing.c`)
-Les tests `converted_value < 0` (lignes ~112 et ~143) ne peuvent jamais être
-vrais.
-```
-Correction : les supprimer, et ajouter un commentaire sur la convention
-             « return 1 = invalide / return 0 = valide » de is_ipv4 / is_mac_addr.
-```
-
-## C.6 Validation
+**Validation :**
 ```sh
-make re && make debug         # build asan/ubsan
-make up && make run           # puis put/get + CTRL+C : pas de leak, exit 0 rapide
-python3 tests/run_all.py      # tout reste vert
+make re && make debug        # build asan/ubsan
+make up && make run          # put/get + CTRL+C : pas de leak, exit 0 rapide
+python3 tests/run_all.py     # tout reste vert
 ```
 
----
----
+### 6.3 Module D — Cohérence documentaire ✅ **FAIT**
 
-# MODULE D — Cohérence documentaire ✅ **FAIT (09/08)**
+README réaligné : arborescence des **vrais** fichiers, `docker-compose.yml`
+corrigé, section « Project status » marquant le sniffing comme WIP avec le format
+`[FTP] STOR/RETR` présenté comme **cible**. **À revalider** une fois le Module A
+livré : le format documenté doit devenir le format réellement produit.
 
-> **Objectif :** aligner le `README.md` sur le code réel pour ne pas induire
-> l'évaluateur en erreur. **Réalisé.**
+### 6.4 Module E — Bonus verbose `-v` 🟢
 
-## D.1 Arborescence ✅
-Le README listait `src/args.c`, `netinfo.c`, `arp.c`, `inject.c`, `sniff.c`,
-`ftp.c` — **fichiers inexistants**. La section « Project structure » a été
-réécrite avec les vrais fichiers (`main.c`, `parsing.c`, `poisoning.c`,
-`sniffing.c`, `signals.c`, `utils.c`, + `include/` et `tests/`), un commentaire
-par fichier, et une note précisant que parsing = args+IPv4+MAC+interface et
-poisoning = build+inject+restore.
+> **⚠️ À ne traiter que si A→C sont parfaits.**
 
-## D.2 Exemples d'affichage ✅
-Le README montre toujours `[FTP] STOR ...` / `[FTP] RETR ...`, mais une section
-**« Project status »** a été ajoutée : elle marque le sniffing comme **WIP** et
-précise que ce format est la **cible**, pas la sortie actuelle. À revalider une
-fois le Module A implémenté (le format documenté = le format produit).
+Le sujet veut que `-v` affiche **tout** le trafic FTP, **login inclus** (`USER`,
+`PASS`). Le pseudo-code de `ftp_handler` porte déjà la branche `if s.verbose`
+(§ 4.4) ; `t_sniffer` et `t_config` ont déjà `verbose`. Il reste à **parser le
+flag** et le **propager**.
 
-## D.3 `docker-compose.yaml` vs `.yml` ✅
-Corrigé : le README cite désormais `docker-compose.yml` (le vrai fichier).
+**Corps (delta parsing)** :
 
-## D.4 Validation
-Relecture croisée README ↔ `ls src/` ↔ sortie réelle de `make run` : **OK**.
-`make help` a aussi été ajouté à la liste des cibles.
-
----
----
-
-# MODULE E — Bonus verbose `-v` 🟢
-
-> **Objectif sujet :** un mode `-v` qui affiche **tout** le trafic FTP (login
-> inclus : `USER`, `PASS`, …), pas seulement les noms de fichiers.
-> **⚠️ À ne traiter que si A→D sont parfaits** — le bonus n'est évalué que dans ce
-> cas.
-
-## E.1 Étapes
-1. **Parser le flag** dans `parse_arguments` : accepter un 5ᵉ argument optionnel
-   `-v` (donc `ac == 5` **ou** `ac == 6 && strcmp(av[5], "-v") == 0`).
-2. **Stocker** `int verbose` dans `t_config`.
-3. **Propager** `verbose` à `start_sniffer` → `ftp_handler` (déjà prévu dans le
-   pseudo-code du Module A : la branche `SI *verbose` existe).
-4. En mode verbose, afficher **toutes** les lignes FTP, pas seulement STOR/RETR.
-
-## E.2 Pseudo-code (delta parsing)
 ```
-FONCTION parse_arguments(ac, av, config) :
+parse_arguments(ac : int, av : char**, config : t_config*):
     config.verbose = 0
-    SI ac == 6 ET av[5] == "-v" : config.verbose = 1 ; ac = 5   // normalise
-    SI ac != 5 : error("invalid number of arguments")
-    ... (validation existante inchangée)
+    if ac == 6 and av[5] is "-v":
+        config.verbose = 1
+        ac = 5                          // normalise, then reuse existing validation
+    if ac != 5:
+        error("invalid number of arguments", 1, config)
+    ... existing validation unchanged ...
 ```
 
-## E.3 Pièges
-- Le sujet insiste : **login inclus** → capturer aussi `USER`/`PASS`, donc ne pas
-  filtrer sur STOR/RETR en mode `-v`.
-- Un paquet peut contenir plusieurs lignes ou une ligne coupée → itérer sur les
-  lignes et rester tolérant.
+**Test (extension de `test_ftp.py`)** :
 
-## E.4 Test (extension de `test_ftp.py`)
 ```python
-def test_verbose_shows_login(self):
-    # inquisitor lancé avec -v
+def test_verbose_shows_login(self):     # inquisitor launched with -v
     self._lftp("put /etc/hostname -o up.txt; bye")
     out = read_stdout_until(self.proc, "PASS", timeout=5)
     self.assertIn("USER test", out)
     self.assertIn("PASS 1234", out)
 ```
 
-## E.5 Résultat attendu
+**Résultat attendu :**
 ```
 [FTP] USER test
 [FTP] PASS 1234
 [FTP] STOR up.txt
-[FTP] RETR hello.txt
 ```
 
 ---
+
+## 7. Un schéma qui porte le § 3.2 : la descente des couches
+
+Un `STOR up.txt` réel, avec des options TCP (donc `tcp_len = 32`, pas 20). Les
+valeurs sont concrètes exprès — c'est le contraste `20` vs `32` qui rend le piège
+visible.
+
+| Couche | Offset début | Longueur | D'où vient la longueur | Contenu |
+|---|---|---|---|---|
+| Ethernet | 0 | 14 (fixe) | constante | `ether_type = 0x0800` (IPv4) |
+| IP | 14 | **20** | `ip_hl = 5` → `5 × 4` | `ip_p = 6` (TCP) |
+| TCP | 34 | **32** | `doff = 8` → `8 × 4` | (avec options) |
+| payload | **66** | 13 | `caplen(79) − 66` | `STOR up.txt\r\n` |
+
+Cas dégénéré à opposer — un **ACK pur** sur la même connexion :
+
+| Couche | Offset | Longueur | Contenu |
+|---|---|---|---|
+| Eth+IP+TCP | 0 | 54 | entêtes seuls |
+| payload | 54 | **0** | `caplen(54) == headers` → `return` (pas de ligne fantôme) |
+
+Et le découpage d'un segment qui porte **deux lignes** (bonus `-v`) :
+
+```
+  payload (payload_len = 21)
+  ┌──────────────────────────────────────────────┐
+  │ U S E R   t e s t \r \n P A S S   1 2 3 4 \r \n │
+  └───────────────────┬────────────────┬───────────┘
+       memchr '\n' ────┘   memchr '\n' ─┘
+   tour 1 : "USER test"   tour 2 : "PASS 1234"
+```
+
 ---
 
-## Ordre de développement recommandé (global)
+## 8. Ordre de développement recommandé
 
-1. **Module A** — sniffing FTP (le verrou). Sous-ordre : `sniffing.h` → ouverture
-   pcap seule → parsing STOR/RETR → thread + arrêt propre → test manuel.
-2. **Module B** — `tests/test_ftp.py` (automatiser la validation de A).
-3. **Module C** — corrections de robustesse (mémoire, CTRL+C, structs).
-4. **Module D** — réalignement du README.
-5. **Module E** — bonus `-v` (seulement si 1→4 parfaits).
+1. **Corriger les bugs bloquants** du § 5 pour que `sniffing.c` **compile**
+   (`char *iface`, `ntohs`, casts, `handle` local).
+2. **Module A**, sous-ordre : `discover_interface` (iface) → `start_sniffer`
+   (ouverture + filtre, sans thread d'abord) → `ftp_handler` (parse STOR/RETR) →
+   thread + `stop_sniffer` → intégration `main`.
+3. **Test manuel** :
+   ```sh
+   make up ; make run                                       # terminal 1
+   docker compose exec client lftp -u test,1234 \
+     -e "put /etc/hostname -o up.txt; bye" 192.168.0.2      # terminal 2
+   # attendu terminal 1 : [FTP] STOR up.txt
+   ```
+4. **Module B** — `tests/test_ftp.py` (automatise la validation de A).
+5. **Module C** — robustesse (mémoire, CTRL+C, structs).
+6. **Module D** — revalider le README contre la sortie réelle.
+7. **Module E** — bonus `-v`, seulement si 1→6 parfaits.
 
-> **Mandatory soutenable** dès que A + B sont verts (et que les tests ARP
-> existants ne régressent pas). C + D renforcent la soutenance. E est l'extra.
+> Quand `[FTP] STOR/RETR <fichier>` s'affiche en direct **et** que le CTRL+C reste
+> propre (exit 0, `test_exit_code_zero_after_sigint` vert), le mandatory est
+> soutenable. C renforce, E est l'extra.
+```

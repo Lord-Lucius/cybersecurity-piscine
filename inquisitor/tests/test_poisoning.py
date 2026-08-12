@@ -2,6 +2,7 @@
 
 Shared plumbing lives in helpers.py (lab constants, arp cache, start/stop, ...).
 """
+import sys
 import time
 import unittest
 
@@ -47,9 +48,16 @@ class TestARPPoisoning(unittest.TestCase):
         self.assertEqual(get_arp_mac("server", CLIENT_IP), ATTACKER_MAC)
 
     def test_forwarding_ping_works(self):
-        """Ping client -> server must succeed (ip_forward=1).
-        Validated manually via make run + ping; skipped in CI (Mac Docker limits)."""
-        self.skipTest("validated manually — Mac Docker Desktop ICMP forwarding unreliable in exec")
+        """Ping client -> server must succeed THROUGH the MITM (ip_forward=1):
+        proves the attack is transparent, not a black hole. Skipped only on macOS
+        where Docker Desktop's ICMP-in-exec is unreliable."""
+        if sys.platform == "darwin":
+            self.skipTest("macOS Docker Desktop: ICMP forwarding in exec unreliable")
+        out, _, code = compose_exec("client",
+            ["ping", "-c", "3", "-W", "2", SERVER_IP], timeout=12)
+        self.assertEqual(code, 0, f"ping through MITM failed:\n{out}")
+        self.assertIn("0% packet loss", out,
+            f"traffic not forwarded transparently:\n{out}")
 
 
 # ── ARP restore tests ─────────────────────────────────────────────────────────

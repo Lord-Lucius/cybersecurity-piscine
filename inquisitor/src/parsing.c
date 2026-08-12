@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/12 20:51:40 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/11 17:21:53 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/12 11:11:09 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -201,6 +201,13 @@ int discover_interface(t_config *config) {
 }
 
 void parse_arguments(int ac, char **av, t_config *config) {
+
+	config->verbose = 0;
+	if (ac == 6 && ft_strcmp(av[5], "-v") == 0) {
+		config->verbose = 1;
+		ac = 5;
+	}
+
 	if (ac != 5) error("invalid number of arguments", 1, config);
 	config->spoof_ip = av[1];
 	config->spoof_mac = av[2];

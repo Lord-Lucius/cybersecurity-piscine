@@ -1,5 +1,5 @@
 import unittest
-from helpers import run
+from helpers import run, lab_is_up
 
 VALID_MAC_SRC  = "02:42:c0:a8:00:02"
 VALID_MAC_DST  = "02:42:c0:a8:00:03"
@@ -10,6 +10,7 @@ def args(ip_src=VALID_IP_SRC, ip_dst=VALID_IP_DST):
     return [ip_src, VALID_MAC_SRC, ip_dst, VALID_MAC_DST]
 
 
+@unittest.skipUnless(lab_is_up(), "Docker lab is not running")
 class TestIPv4Valid(unittest.TestCase):
 
     def test_standard(self):
@@ -41,6 +42,7 @@ class TestIPv4Valid(unittest.TestCase):
         self.assertEqual(code, 0)
 
 
+@unittest.skipUnless(lab_is_up(), "Docker lab is not running")
 class TestIPv4Invalid(unittest.TestCase):
 
     def test_src_missing_octet(self):

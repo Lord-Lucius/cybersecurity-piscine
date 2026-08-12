@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/10 11:02:46 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/08 19:09:07 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/11 22:14:55 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,10 +20,14 @@
 int main(int ac, char **av) {
 
 	setup_signals();
+	setvbuf(stdout, NULL, _IOLBF, 0); // without this python tests don't see the printf
 
 	t_config config = {0};
 	parse_arguments(ac, av, &config);
 	print_config(&config);
+
+	t_sniffer sniffer = {0};
+	start_sniffer(&sniffer, &config);
 
 	t_config config_in = config;
 	config_in.spoof_ip  = config.target_ip;
@@ -43,8 +47,8 @@ int main(int ac, char **av) {
 		sleep(1);
 	}
 
+	stop_sniffer(&sniffer);
 	restore_arp(fd, config);
-
 	close(fd);
 	free_ressources(&config);
 

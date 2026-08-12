@@ -1,8 +1,9 @@
 import unittest
-from helpers import run
+from helpers import run, lab_is_up
 
 VALID = ["192.168.0.2", "02:42:c0:a8:00:02", "192.168.0.3", "02:42:c0:a8:00:03"]
 
+@unittest.skipUnless(lab_is_up(), "Docker lab is not running")
 class TestArgs(unittest.TestCase):
 
     def test_no_args(self):

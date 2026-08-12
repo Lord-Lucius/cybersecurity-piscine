@@ -1,5 +1,5 @@
 import unittest
-from helpers import run
+from helpers import run, lab_is_up
 
 VALID_IP_SRC  = "192.168.0.2"
 VALID_IP_DST  = "192.168.0.3"
@@ -10,6 +10,7 @@ def args(mac_src=VALID_MAC_SRC, mac_dst=VALID_MAC_DST):
     return [VALID_IP_SRC, mac_src, VALID_IP_DST, mac_dst]
 
 
+@unittest.skipUnless(lab_is_up(), "Docker lab is not running")
 class TestMACValid(unittest.TestCase):
 
     def test_standard(self):
@@ -41,6 +42,7 @@ class TestMACValid(unittest.TestCase):
         self.assertEqual(code, 0)
 
 
+@unittest.skipUnless(lab_is_up(), "Docker lab is not running")
 class TestMACInvalid(unittest.TestCase):
 
     def test_src_5_octets(self):

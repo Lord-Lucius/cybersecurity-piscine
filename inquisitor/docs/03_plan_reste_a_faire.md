@@ -15,21 +15,21 @@
 **Fait (voir Doc 1 & 2) :**
 - Parsing, découverte de l'interface locale, poisoning ARP full-duplex, restore
   sur CTRL+C : opérationnels et testés (suite Python ARP verte).
-- **`include/sniffing.h` est réconcilié** : `t_sniffer` (handle `pcap_t*` +
-  `pthread_t` + `verbose`) et les prototypes passent bien par **pointeur**, et
-  `ftp_handler` a la signature imposée par `pcap_loop`. Le contrat de A.3 est
-  donc **déjà atteint** côté header.
-- **`t_config` a gagné `iface` et `verbose`** — mais `iface` est typé `char` au
-  lieu de `char *` (voir piège § 5). `discover_interface` **ne stocke pas encore**
-  le nom de l'interface.
-- **`src/sniffing.c` est amorcé** : `start_sniffer`, `capture_loop` et un début de
-  `ftp_handler` sont écrits, mais **buggés et incomplets** ; `stop_sniffer` est en
-  commentaire. **Rien n'est intégré à `main`** et le binaire de sniffing ne
-  compile pas en l'état (voir § 5).
+- **Module A (sniffing FTP) implémenté au 11/08.** `include/sniffing.h` réconcilié
+  (prototypes par **pointeur**, `ftp_handler` conforme à `pcap_loop`). `t_config` a
+  gagné `iface` (typé **`char[IFNAMSIZ]`**, un buffer — pas `char*`) et `verbose`.
+  `discover_interface` **stocke désormais** le nom de l'interface
+  (`ft_strlcpy(config->iface, ifa_name, IFNAMSIZ)`). `src/sniffing.c` est **complet
+  et compile** (`-Wall -Wextra -Werror`) : `start_sniffer` (open + datalink +
+  filtre + thread), `capture_loop`, `ftp_handler` (descente Eth→IP→TCP, parse
+  `STOR`/`RETR`, `printf %.*s`) et `stop_sniffer` (`breakloop → join → close`).
+  Le sniffer est **intégré à `main`** (démarré avant la boucle de poison, arrêté
+  avant `restore_arp`), et `setvbuf(stdout, _IOLBF)` garantit la visibilité en pipe.
 
 **À faire dans cette phase :**
-- Module A : rendre le sniffing FTP fonctionnel (capture → parse `STOR`/`RETR` →
-  thread → arrêt propre) et l'intégrer à `main`.
+- Module A : **valider en conditions réelles** dans le lab (`make up` / `make run`
+  + `put`/`get` → `[FTP] STOR/RETR` en direct, CTRL+C propre). Compilation et revue
+  statique sont vertes ; il ne reste que la **preuve fonctionnelle**.
 - Module B : une suite de tests FTP (`tests/test_ftp.py`).
 - Module C : corrections de robustesse (mémoire, CTRL+C, structs).
 
@@ -43,7 +43,7 @@
 
 | Module | Titre | Sévérité | Bloque le rendu ? |
 |--------|-------|----------|-------------------|
-| **A** | Sniffing FTP + affichage des fichiers | 🔴 | **Oui** (exigence mandatory) |
+| **A** | Sniffing FTP + affichage des fichiers | 🟢 | *Implémenté au 11/08 — reste la **validation live*** |
 | **B** | Tests FTP | 🔴 | **Oui** (exigés par le sujet) |
 | **C** | Robustesse (mémoire, CTRL+C, trames) | 🟠 | Non, mais attendu en soutenance |
 | ~~**D**~~ | ~~Cohérence documentaire (README)~~ | ✅ | **Fait** |
@@ -197,10 +197,22 @@ selon le timing des deux threads.
 
 ---
 
-## 4. Module A — le corps, une section par fonction 🔴
+## 4. Module A — le corps, une section par fonction 🟢 **IMPLÉMENTÉ (11/08)**
 
 > **Objectif sujet** : « afficher en temps réel les noms des fichiers échangés
 > entre un client et un serveur FTP ». Seul verrou du mandatory.
+
+> **État au 11/08 :** ce module est **écrit, compile et intégré à `main`** ; les
+> tests de parsing restent verts. Cette section garde toute sa valeur de
+> **référence / checklist** (elle a servi à le construire). **Deux écarts assumés**
+> vs. le guide ci-dessous, tous deux sans danger :
+> - `iface` a été fait en **buffer `char[IFNAMSIZ]`** (au lieu de `char*` +
+>   `ft_strdup`) → rempli par `ft_strlcpy`, **aucun `free` à prévoir**.
+> - `start_sniffer` garde **`error()`** (au lieu de `return -1`) — OK ici car il
+>   s'exécute **avant** tout empoisonnement, donc un échec ne laisse aucune victime
+>   empoisonnée.
+>
+> Reste : la **validation live** en lab (voir § 4.6 et test manuel du README).
 
 **Ordre de dépendance** (on code de haut en bas) : la boîte à outils, puis
 `discover_interface` (delta), `start_sniffer`, `capture_loop`, `ftp_handler`,
@@ -240,19 +252,20 @@ sections d'algorithme.
 > seul `doff` compile. Idem `struct ip` (`ip_hl`) vs `struct iphdr` (`ihl`) :
 > choisir `struct ip`/`ip_hl` et inclure `<netinet/ip.h>`.
 
-### 4.1 · discover_interface (delta : stocker l'interface)
+### 4.1 · discover_interface (delta : stocker l'interface) ✅ fait
 
-**Ce qu'elle doit accomplir.** Elle découvre déjà IP/MAC/index locaux. Il manque
+**Ce qu'elle doit accomplir.** Elle découvre déjà IP/MAC/index locaux. Il manquait
 une chose : **conserver le nom** de l'interface (`tmp->ifa_name`) pour que
-`start_sniffer` sache quoi ouvrir. Aujourd'hui `ifa_name` sert au `ioctl` puis est
-perdu.
+`start_sniffer` sache quoi ouvrir. **C'est fait** (`config->iface` rempli dans le
+bloc `AF_INET`).
 
-**Décisions**
+**Décisions** *(choix retenu : le buffer)*
 
 | Décision | Pourquoi |
 |---|---|
-| `iface` typé `char *` (pas `char`) | il faut stocker une chaîne (`"eth0"`), pas un octet ; voir piège § 5 |
-| `ft_strdup` de `ifa_name` | `interface` est libéré par `freeifaddrs` avant le retour — garder un pointeur dessus serait un dangling |
+| `iface` en **buffer `char[IFNAMSIZ]`** (choix retenu) | un nom d'IF est court et borné (`IFNAMSIZ` = 16) → pas de `malloc`, donc **pas de `free`** à gérer. `#include <net/if.h>` pour `IFNAMSIZ` |
+| *(alternative)* `char *iface` + `ft_strdup` | valable aussi, cohérent avec `local_ip`/`local_mac`, mais impose un `free(config->iface)` dans `free_ressources` |
+| `ft_strlcpy(config->iface, ifa_name, IFNAMSIZ)` | `interface` est libéré par `freeifaddrs` avant le retour — on **copie** le nom, pas un pointeur (qui deviendrait dangling) |
 
 **🧭 Quoi utiliser, et pourquoi**
 
@@ -266,15 +279,16 @@ perdu.
 int discover_interface(t_config *config);   /* + config->iface = ft_strdup(ifa_name) */
 ```
 
-**Corps** (delta seulement) :
+**Corps** (delta seulement, **fait**) :
 
 ```
 // inside the AF_INET branch, right after local_ip is set:
-config.iface = duplicate the interface name   // survives freeifaddrs   → §4.0
+copy the interface name into config.iface     // ft_strlcpy, survives freeifaddrs → §4.0
 ```
 
-⚠️ Ajouter le `free(config->iface)` correspondant dans `free_ressources`, sinon
-fuite à chaque exécution.
+> Avec le buffer `char[IFNAMSIZ]` retenu, **rien à libérer**. (Si tu repasses un
+> jour à `char*` + `ft_strdup`, pense au `free(config->iface)` dans
+> `free_ressources`.)
 
 ### 4.2 · start_sniffer
 
@@ -496,9 +510,10 @@ est déjà `absent`, elle ne fait rien.
 | Garder l'ordre `breakloop → join → close` | fermer un handle qu'un thread lit encore = use-after-free (§ 3.5) |
 | Mettre `s->handle = absent` après `close` | rend un double appel sans danger |
 
-⚠️ **Piège** : c'est la fonction **actuellement en commentaire** dans
-`sniffing.c`. Tant qu'elle manque, le CTRL+C laisse le thread dans `pcap_loop` et
-le process ne se termine pas proprement → `test_exit_code_zero_after_sigint` casse.
+✅ **Désormais implémentée** (`breakloop → join → close` + `s->handle = NULL`, avec
+garde si `s->handle` est déjà `NULL`). Rappel du pourquoi : sans elle, le CTRL+C
+laisserait le thread dans `pcap_loop` et le process ne se terminerait pas proprement
+→ `test_exit_code_zero_after_sigint` casserait. À confirmer par le test live.
 
 **Prototype**
 
@@ -543,23 +558,37 @@ restore_arp() ; close(fd) ; free_ressources()
 > poison, il faut `restore_arp` avant de sortir — d'où l'importance de démarrer le
 > sniffer **avant** la boucle.
 
+> **Implémentation réelle (11/08) :** `discover_interface()` est appelé **par
+> `parse_arguments()`** (pas séparément dans `main`). Et comme `start_sniffer`
+> garde `error()`, le garde `if … != 0 { cleanup ; return 1 }` est simplifié en un
+> simple `start_sniffer(&s, &config);` (l'échec fait `exit()` de lui-même, sans
+> victime empoisonnée puisque c'est avant la boucle). Le reste de l'ordre —
+> `stop_sniffer` **avant** `restore_arp` — est respecté tel quel.
+
 ---
 
 ## 5. Pièges spécifiques à cette phase
 
-Ceux qui n'appartiennent à aucun concept seul — dont les **bugs déjà présents**
-dans `sniffing.c`/`inquisitor.h` au 11/08, à corriger avant tout :
+Les **bugs qui étaient présents** dans `sniffing.c`/`inquisitor.h`/`main.c` sont
+**tous corrigés au 11/08** (historique conservé pour la soutenance) :
 
-| Bug actuel | Symptôme | Correction |
+| Bug (historique) | Symptôme | Statut |
 |---|---|---|
-| `t_config.iface` typé **`char`** | `pcap_open_live(&config->iface, …)` passe l'adresse d'un octet, pas une chaîne → interface introuvable / ouverture d'un mauvais device | `char *iface;` + `ft_strdup(ifa_name)` (§ 4.1) |
-| `discover_interface` ne stocke pas `ifa_name` | `iface` reste vide même une fois typé `char*` | ajouter la ligne du § 4.1 |
-| `stohs(eth->ether_type)` | **ne compile pas** (`stohs` n'existe pas) | `ntohs` |
-| `pcap_datalink/compile/setfilter` sur `s->handle` non affecté | segfault au démarrage (`s->handle` vaut garbage) | travailler sur la locale `handle`, publier `s->handle` en dernier (§ 4.2) |
-| casts manquants (`eth = packet`, `ip = packet+14`) | warning/erreur `-Werror` | caster `(struct ether_header *)`, `(struct ip *)` |
-| `pcap_freecode(&fp)` absent sur le chemin succès | petite fuite à chaque lancement | libérer après `setfilter`, succès comme échec |
-| `stop_sniffer` en commentaire | CTRL+C ne termine pas proprement → `test_exit_code_zero_after_sigint` rouge | l'implémenter (§ 4.5) et l'appeler dans `main` |
-| sniffer appelle `error()` (→ `exit`) | échec sniffer = process tué **avant** `restore_arp` → victimes laissées empoisonnées | rendre `-1`, laisser `main` décider (§ 4.2) |
+| `t_config.iface` typé **`char`** | `pcap_open_live` recevait un octet, pas une chaîne | ✅ corrigé → `char[IFNAMSIZ]` (§ 4.1) |
+| `discover_interface` ne stockait pas `ifa_name` | `iface` restait vide | ✅ corrigé → `ft_strlcpy` |
+| `stohs(eth->ether_type)` | ne compilait pas | ✅ corrigé → `ntohs` |
+| `pcap_*` sur `s->handle` non affecté | segfault au démarrage | ✅ corrigé → locale `handle`, publiée en dernier |
+| casts manquants (`eth`, `ip`, `tcp`) | erreur `-Werror` | ✅ corrigé |
+| `pcap_freecode(&fp)` absent (succès) | petite fuite | ✅ corrigé |
+| `"RET "` au lieu de `"RETR "` (compare sur 5) | détection `RETR` cassée | ✅ corrigé |
+| `stop_sniffer` en commentaire | CTRL+C sale | ✅ corrigé → implémentée + appelée dans `main` |
+| `main` : `if start_sniffer == 0` inversé + `close(ifindex)` | s'auto-tuait avant de poison | ✅ corrigé → appel simple, boucle atteignable |
+| `discover_interface` appelé 2× dans `main` | fuite `local_ip`/`local_mac` | ✅ corrigé → un seul appel (via `parse_arguments`) |
+| sortie invisible en pipe | tests ne voyaient rien | ✅ corrigé → `setvbuf(_IOLBF)` |
+
+> Choix **assumé** (pas un bug) : `start_sniffer` garde `error()` (→ `exit`) au lieu
+> de `return -1`. Sans risque **tant que** le sniffer démarre avant tout
+> empoisonnement (cas actuel) : un échec ne laisse aucune victime empoisonnée.
 
 Pièges transverses (non-bugs, à ne pas introduire) :
 - Promiscuous obligatoire (§ 3.1) — sinon affichage vide.

@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/07/28 15:06:51 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/07/30 11:21:01 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/12 10:08:27 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,12 +85,14 @@ void restore_arp(int fd, t_config config) {
 	t_arp_frame in;
 	build_arp_trame(&in, c_in);
 
-
 	t_config c_out = config;
 	c_out.local_mac = config.spoof_mac;
 
 	t_arp_frame out;
 	build_arp_trame(&out, c_out);
+
+	get_hex_from_mac_addr(in.eth.src_mac, config.local_mac);
+	get_hex_from_mac_addr(out.eth.src_mac, config.local_mac);
 
 	for (int i = 0; i < 5; i++) {
 		send_arp_frame(fd, &in, c_in);

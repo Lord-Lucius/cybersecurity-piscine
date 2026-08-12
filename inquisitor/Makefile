@@ -87,6 +87,7 @@ clean:
 fclean: clean
 	@printf "$(RED)-> Removing $(NAME)$(RESET)\n"
 	@rm -f $(NAME)
+	@rm -f dump_frame
 	@$(MAKE) -C $(LIBFT_DIR) fclean
 
 re: fclean all

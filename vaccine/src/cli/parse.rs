@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:05:47 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/13 10:47:15 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/14 18:06:04 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,41 +20,48 @@ pub fn parse(args: Vec<String>) -> Result<Config, VaccineError> {
 
     let mut i: usize = 1;
     while i < args.len() {
-        let token: &str = &args[1];
+        let token: &str = &args[i];
 
-        if token.eq("-h") || token.eq("--help") {
+        if token == "-h" || token == "--help" {
             return Err(Usage("error".to_string()));
-        } else if token.eq("-X") {
+        } else if token == "-X" {
             let next: Option<&str> = args.get(i + 1).map(String::as_str);
-            if next == None {
-                return Err(Usage("-X required a method (GET/POST)".to_string()));
-            }
+
             method = match next {
                 Some("GET") => HttpMethod::Get,
                 Some("POST") => HttpMethod::Post,
-                _ => return Err(Usage(String::from("unknown method")))
+                Some(_) => return Err(Usage("unknown method".to_string())),
+                None => return Err(Usage("-X requires a method (GET/POST)".to_string())),
             };
-            i = i + 2;
-        } else if token.eq("-o") {
+            i += 2;
+        } else if token == "-o" {
             let next: Option<&str> = args.get(i + 1).map(String::as_str);
-            if next == None {
-                return Err(Usage("-o requires a filename".to_string()));
-            }
-            output = Some(next);
-            i = i + 2;
+
+            match next {
+                Some(filename) => {
+                    output = Some(filename.to_string());
+                    i += 2;
+                },
+                None => return Err(Usage("-o requires a filename".to_string())),
+            };
         } else if token.starts_with('-') {
-            return Err(Usage(String::from(format!("unkown option: {token}"))));
+            return Err(Usage(format!("unknown option: {token}")));
         } else {
-            if !url.is_none() {
-                return Err(Usage(String::from("only one URL is allowed")));
+            match url {
+                Some(_) => {
+                    return Err(Usage("only one URL is allowed".to_string()));
+                }
+                None => {
+                    url = Some(token.to_owned());
+                    i += 1;
+                }
             }
-            url = Some(token);
-            i = i + 1;
         }
     }
 
-    if url.is_none() {
-        return Err(Usage(String::from("missing target URL")));
-    }
+    let url: String = url.ok_or(Usage("missing target URL".to_string()))?;
+
     Ok(Config { url, method, output })
 }
+
+pub fn print_help()

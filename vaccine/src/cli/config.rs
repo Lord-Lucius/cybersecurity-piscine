@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:12:39 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/13 10:40:41 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/14 17:57:30 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,7 +16,7 @@ pub enum HttpMethod {
 }
 
 pub struct Config {
-    url: String,
-    method: HttpMethod,
+    pub(crate) url: String,
+    pub(crate) method: HttpMethod,
     pub(crate) output: Option<String>,
 }

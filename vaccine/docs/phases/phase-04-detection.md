@@ -87,7 +87,7 @@ Documentation :
 
 ### 3.2 Les signatures d'erreur SQL
 
-L'error-based repose sur une table de sous-chaînes qui trahissent un SGBD renvoyant son erreur brute. Ces motifs servent ici (détecter *qu'il y a* une erreur) et resserviront en [phase 5](README.md) (dire *quel* moteur).
+L'error-based repose sur une table de sous-chaînes qui trahissent un SGBD renvoyant son erreur brute. Ces motifs servent ici (détecter *qu'il y a* une erreur) et resserviront en [phase 5](phase-05-fingerprint.md) (dire *quel* moteur).
 
 | Moteur | Signature dans le corps |
 |---|---|
@@ -113,7 +113,7 @@ Le résultat d'un test n'est pas un `bool` : c'est « sûr » **ou** « vulnéra
 | baseline | la `Response` à l'URL non injectée | `scanner::run` |
 | signature | sous-chaîne qui trahit une erreur SQL | `techniques::SQL_ERRORS` |
 | tolérance | marge de longueur admise entre deux réponses « identiques » | `techniques::similar` |
-| `Verdict` | `enum` : `Safe` ou `Vulnerable { … }` | [`src/techniques.rs`](../../src/techniques.rs) |
+| `Verdict` | `enum` : `Safe` ou `Vulnerable { … }` | [`src/techniques/compare.rs`](../../src/techniques/compare.rs) |
 | baseline vraie/fausse | réponses à `AND 1=1` / `AND 1=2` | `boolean_based` |
 
 ---
@@ -138,7 +138,7 @@ Le résultat d'un test n'est pas un `bool` : c'est « sûr » **ou** « vulnéra
 | Chercher une sous-chaîne | `body.contains("…")` |
 | Longueur | `body.len()` |
 | Valeur absolue d'un écart | `(a as isize - b as isize).unsigned_abs()` |
-| Table de signatures | `const SQL_ERRORS: &[&str] = &["You have an error…", …];` |
+| Table de signatures | une constante `SQL_ERRORS` : une slice de sous-chaînes (`&[&str]`), dont le contenu est décrit en § 3.2 |
 
 ### 5.1 · `similar`
 
@@ -153,10 +153,10 @@ Le résultat d'un test n'est pas un `bool` : c'est « sûr » **ou** « vulnéra
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
-| `same status` | comparer `a.status == b.status` |
-| `lengths within tolerance` | écart de `len` rapporté au plus grand, comparé au seuil |
+| même statut | comparer `a.status` et `b.status` |
+| longueurs dans la tolérance | écart des longueurs rapporté à la plus grande, comparé au seuil |
 
 **Prototype**
 
@@ -166,16 +166,7 @@ pub fn similar(a: &Response, b: &Response, tolerance: f64) -> bool;
 
 **Corps**
 
-```
-similar(a : &Response, b : &Response, tolerance : f64) -> bool:
-    if a.status != b.status:
-        return false
-    longest : usize = max(a.body.len(), b.body.len())
-    if longest == 0:
-        return true                                  // both empty
-    diff : usize = absolute difference of the two lengths
-    return (diff as ratio of longest) <= tolerance
-```
+**Déroulé.** On tranche d'abord sur le statut : si les deux réponses n'ont pas le même code HTTP, ce n'est pas la même page — on renvoie *faux* sans lire les corps. Sinon on retient la plus grande des deux longueurs de corps ; si elle est nulle (deux corps vides), les réponses sont identiques, on renvoie *vrai*. Autrement, on rapporte l'écart absolu des deux longueurs à cette plus grande longueur, et on renvoie *vrai* tant que ce ratio reste sous la `tolerance`.
 
 ### 5.2 · `error_based`
 
@@ -194,10 +185,10 @@ similar(a : &Response, b : &Response, tolerance : f64) -> bool:
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
-| `send with a broken-syntax payload` | `with_injected(key, base + "'")` puis `client.send(...)` |
-| `any SQL error signature present` | boucler sur `SQL_ERRORS`, `body.contains(sig)` |
+| envoyer un payload à syntaxe cassée | `with_injected(key, valeur + "'")` puis `client.send(...)` |
+| une signature d'erreur SQL est présente | boucler sur `SQL_ERRORS`, `body.contains(sig)` |
 
 *Troisième temps :* on cherche des signatures **spécifiques** (§ 3.2) et non le mot « error » : la présence d'un message *propre au SGBD* est une preuve quasi certaine d'injection, là où un mot générique ne prouve rien. C'est ce qui rend error-based fiable malgré sa simplicité.
 
@@ -216,18 +207,7 @@ pub fn error_based(client: &Client, cfg: &Config, target: &Target, key: &str)
 
 **Corps**
 
-```
-error_based(client, cfg, target, key : &str) -> Result<Verdict, VaccineError>:
-    for each payload in ["'", "\"", "')"]:
-        url  : String   = inject payload into key                → Target · with_injected
-        resp : Response = client.send(cfg.method, url, form)?    → phase 3
-        for each sig in SQL_ERRORS:
-            if resp.body contains sig:
-                log ①
-                return Ok(Vulnerable { key, method: cfg.method,
-                                       technique: ErrorBased, payload })
-    return Ok(Safe)
-```
+**Déroulé.** Pour chacun des payloads à syntaxe cassée — un simple `'`, puis `"`, puis `')` — on injecte le payload dans le paramètre `key` (→ phase 2) et on envoie la requête (→ phase 3). On parcourt ensuite la table `SQL_ERRORS` : si le corps de la réponse contient l'une de ces signatures, on journalise (log ①) et on rend un verdict *vulnérable* portant le paramètre, la méthode, la technique error-based et le payload gagnant. Si aucun payload ne fait fuiter d'erreur, on rend *sûr*.
 
 ### 5.3 · `boolean_based`
 
@@ -247,11 +227,11 @@ error_based(client, cfg, target, key : &str) -> Result<Verdict, VaccineError>:
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
-| `send the true and false variants` | deux `with_injected` + deux `send` |
-| `true looks like baseline` | `similar(resp_true, baseline, tol)` → § 5.1 |
-| `false differs from baseline` | `not similar(resp_false, baseline, tol)` |
+| envoyer les variantes vraie et fausse | deux `with_injected` + deux `send` |
+| la variante vraie ressemble à la baseline | `similar(resp_true, baseline, tol)` → § 5.1 |
+| la variante fausse en diffère | négation de `similar(resp_false, baseline, tol)` |
 
 *Troisième temps :* la double condition encode le raisonnement pentesteur : si le paramètre **modifie** la requête, alors une condition toujours-vraie ne change rien au résultat (donc ≈ baseline) tandis qu'une condition toujours-fausse vide le résultat (donc ≠ baseline). Un paramètre inerte, lui, ignore les deux : les trois réponses se ressemblent, et la double condition n'est jamais remplie. C'est pourquoi tester une seule des deux laisse passer des faux positifs.
 
@@ -271,25 +251,7 @@ pub fn boolean_based(client: &Client, cfg: &Config, target: &Target,
 
 **Corps**
 
-```
-boolean_based(client, cfg, target, key, baseline : &Response)
-    -> Result<Verdict, VaccineError>:
-
-    true_payload  : &str = original value + " AND 1=1"
-    false_payload : &str = original value + " AND 1=2"
-
-    resp_true  : Response = send with true_payload injected into key    → phase 3
-    resp_false : Response = send with false_payload injected into key
-
-    true_matches  : bool = similar(resp_true,  baseline, tolerance)     → F · similar
-    false_differs : bool = not similar(resp_false, baseline, tolerance)
-
-    log ①
-    if true_matches and false_differs:
-        return Ok(Vulnerable { key, method: cfg.method,
-                               technique: BooleanBased, payload: true_payload })
-    return Ok(Safe)
-```
+**Déroulé.** On forme deux payloads en suffixant la valeur d'origine : une condition toujours vraie (` AND 1=1`) et une toujours fausse (` AND 1=2`). On envoie chacune injectée dans `key`, ce qui donne deux réponses. On les juge avec `similar` (→ § 5.1) : la variante vraie doit **ressembler** à la baseline, et la variante fausse doit en **différer**. On journalise le résultat des deux comparaisons (log ①). Si ces deux conditions sont réunies ensemble, on rend *vulnérable* — le paramètre, la méthode, la technique boolean-based, et le payload vrai comme preuve ; sinon *sûr*.
 
 ### 5.4 · `scanner::run`
 
@@ -311,27 +273,7 @@ pub fn run(cfg: &Config) -> Result<Option<Verdict>, VaccineError>;
 
 **Corps**
 
-```
-run(cfg : &Config) -> Result<Option<Verdict>, VaccineError>:
-
-    client   : Client   = Client::new()                    → phase 3
-    target   : Target   = parse cfg.url                    → phase 2
-    baseline : Response = send the non-injected request     → phase 3
-
-    if target.params is empty:
-        return Ok(absent)                                   // nothing to inject
-
-    for each param in target.params:
-        verdict : Verdict = error_based(client, cfg, target, param.key)?   → F · error_based
-        if verdict is Vulnerable:
-            return Ok(Some(verdict))
-
-        verdict = boolean_based(client, cfg, target, param.key, baseline)? → F · boolean_based
-        if verdict is Vulnerable:
-            return Ok(Some(verdict))
-
-    return Ok(absent)                                       // all params safe
-```
+**Déroulé.** On construit le `Client` (→ phase 3), on parse l'URL de la `Config` en `Target` (→ phase 2), et on calcule **une fois** la baseline en envoyant la requête non injectée (→ phase 3). Si le `Target` n'a aucun paramètre, il n'y a rien à injecter : on rend *absent*. Sinon, pour chaque paramètre, on tente d'abord `error_based` (→ § 5.2) ; si le verdict est *vulnérable*, on le rend aussitôt. Sinon on tente `boolean_based` (→ § 5.3) en lui passant la baseline ; s'il conclut *vulnérable*, on le rend. Si aucun paramètre n'est vulnérable après les deux techniques, on rend *absent*.
 
 ---
 
@@ -347,7 +289,7 @@ run(cfg : &Config) -> Result<Option<Verdict>, VaccineError>:
 > [!IMPORTANT]
 > Les techniques appellent le réseau — donc **hors périmètre unitaire** (même raison qu'en phase 3). Ce qui est **testable purement**, c'est `similar` et la recherche de signatures : des fonctions de chaîne sans I/O. On les isole exprès pour ça.
 
-### 7.1 `src/techniques.rs` — `#[cfg(test)]`
+### 7.1 `src/techniques/compare.rs` — `#[cfg(test)]`
 
 **Ce que tu testes :**
 - `similar` : deux corps de même longueur/statut → `true` ; écart au-delà de la tolérance → `false` ; statuts différents → `false`.
@@ -355,34 +297,16 @@ run(cfg : &Config) -> Result<Option<Verdict>, VaccineError>:
 
 **Ce que le test doit prouver au-delà du comportement :** que la **tolérance** fait bien son travail (petit écart accepté, grand écart rejeté), et qu'aucune signature générique ne matche une page ordinaire.
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+**Stratégie.** Ni `similar` ni la recherche de signature ne touchent au réseau : on les appelle avec des `Response` fabriquées à la main. Décrire une **fabrique** locale qui construit une `Response` à partir d'un statut et d'un corps ; les corps se génèrent en répétant un caractère pour contrôler la longueur au pourcentage près.
 
-    fn resp(status: u16, body: &str) -> Response {
-        Response { status, body: body.to_string() }
-    }
+**Les cas à vérifier** (chacun devient un `#[test]`, la tolérance fixée par exemple à 0,05) :
 
-    #[test]
-    fn similar_accepts_small_length_diff() {
-        let a = resp(200, &"x".repeat(1000));
-        let b = resp(200, &"x".repeat(1010));      // +1%
-        assert!(similar(&a, &b, 0.05));
-    }
-
-    #[test]
-    fn similar_rejects_status_mismatch() {
-        assert!(!similar(&resp(200, "ok"), &resp(500, "ok"), 0.05));
-    }
-
-    #[test]
-    fn detects_mysql_signature() {
-        let body = "You have an error in your SQL syntax near '''";
-        assert!(SQL_ERRORS.iter().any(|s| body.contains(s)));
-    }
-}
-```
+| Entrée | Attendu | Pourquoi ce cas |
+|---|---|---|
+| deux corps même statut, longueurs 1000 et 1010 (+1 %) | `similar == true` | un petit écart reste sous la tolérance |
+| deux corps identiques mais statuts 200 et 500 | `similar == false` | le statut tranche avant la longueur |
+| un corps `You have an error in your SQL syntax …` | une signature de `SQL_ERRORS` matche | l'error-based reconnaît l'erreur MySQL |
+| un corps ordinaire, sans message SQL | aucune signature ne matche | pas de faux positif sur une page banale |
 
 ### 7.2 Hors périmètre
 
@@ -406,4 +330,4 @@ mod tests {
 5. Câbler `main` pour afficher le verdict.
 6. `make test` (unitaires) + passe manuelle.
 
-> Quand l'outil nomme le paramètre vulnérable, la technique et le payload sur au moins un labo, cette phase est close. On passe à la **phase 5 : fingerprint du moteur SQL** ([esquisse](README.md)).
+> Quand l'outil nomme le paramètre vulnérable, la technique et le payload sur au moins un labo, cette phase est close. On passe à la **phase 5 : fingerprint du moteur SQL** ([phase-05-fingerprint.md](phase-05-fingerprint.md)).

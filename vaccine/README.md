@@ -37,11 +37,11 @@ Ensuite, deux pistes en parallèle :
 3. [`docs/rust/03-http-io-et-crates.md`](docs/rust/03-http-io-et-crates.md) — crates, requêtes HTTP, fichiers.
 
 **Construire, phase par phase** — [`docs/phases/`](docs/phases/) :
-1. [CLI](docs/phases/phase-01-cli.md) · 2. [URL & paramètres](docs/phases/phase-02-url-et-parametres.md) · 3. [Client HTTP](docs/phases/phase-03-client-http.md) · 4. [Détection](docs/phases/phase-04-detection.md) · 5→9 [esquissées](docs/phases/README.md).
+1. [CLI](docs/phases/phase-01-cli.md) · 2. [URL & paramètres](docs/phases/phase-02-url-et-parametres.md) · 3. [Client HTTP](docs/phases/phase-03-client-http.md) · 4. [Détection](docs/phases/phase-04-detection.md) · 5. [Fingerprint](docs/phases/phase-05-fingerprint.md) · 6. [Schéma](docs/phases/phase-06-extraction-schema.md) · 7. [Dump](docs/phases/phase-07-dump.md) · 8. [Stockage](docs/phases/phase-08-stockage.md) · 9. [Tests](docs/phases/phase-09-tests-environnement.md).
 
 **Organisation & tests** — l'arbre `src/`, la séparation bibliothèque/binaire et où va chaque type de test : [`docs/organisation-et-tests.md`](docs/organisation-et-tests.md).
 
-Les documents de phase descendent au **niveau des fonctions** (prototype, pseudo-code, pièges, tests). Ce README, lui, reste au niveau de l'**architecture d'ensemble**.
+Les documents de phase descendent au **niveau des fonctions** (prototype, algorithme décrit en prose, pièges, tests). Ce README, lui, reste au niveau de l'**architecture d'ensemble**.
 
 ---
 
@@ -55,13 +55,13 @@ argv → cli::parse → url::parse → http::Client → scanner::detect → engi
 
 | Module | Fichier | Rôle |
 |---|---|---|
-| `cli` | `src/cli.rs` | parse `argv` → `Config` |
-| `url` | `src/url.rs` | URL → `Target` + `Param`, réinjection |
-| `http` | `src/http.rs` | requêtes GET/POST → `Response` |
-| `scanner` / `techniques` | `src/scanner.rs`, `src/techniques.rs` | orchestration + error-based / boolean-based |
-| `engine` | `src/engine.rs` | fingerprint du moteur (MySQL, SQLite) |
-| `extract` | `src/extract.rs` | schéma + dump (UNION-based) |
-| `report` | `src/report.rs` | affichage + archivage `-o` |
+| `cli` | `src/cli/` | parse `argv` → `Config` |
+| `url` | `src/url/` | URL → `Target` + `Param`, réinjection |
+| `http` | `src/http/` | requêtes GET/POST → `Response` |
+| `scanner` / `techniques` | `src/scanner/`, `src/techniques/` | orchestration + error-based / boolean-based |
+| `engine` | `src/engine/` | fingerprint du moteur (MySQL, SQLite) |
+| `extract` | `src/extract/` | schéma + dump (UNION-based) |
+| `report` | `src/report/` | affichage + archivage `-o` |
 | `error` | `src/error.rs` | `enum VaccineError`, propagé par `?` |
 
 Toute la logique vit dans une **bibliothèque** (`src/lib.rs`) ; `src/main.rs` n'est qu'un lanceur mince. Les tests unitaires sont dans chaque module (`#[cfg(test)]`), les tests d'intégration dans `tests/`. Détail : [organisation & tests](docs/organisation-et-tests.md). Justification des autres choix : [feuille de route § 2-3](docs/00-feuille-de-route.md).

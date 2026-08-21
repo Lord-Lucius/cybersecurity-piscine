@@ -129,15 +129,15 @@ impl Extractor for MySqlExtractor {
 
 ---
 
-## 5. Les modules : un fichier = un `mod`
+## 5. Les modules : un fichier **ou un dossier** = un `mod`
 
-On déclare les modules dans **`lib.rs`** (la racine de la bibliothèque) ; chaque nom correspond à un fichier `src/<nom>.rs`. Le pourquoi de cette séparation lib/binaire — et ce qu'elle apporte aux tests — est détaillé dans [`../organisation-et-tests.md`](../organisation-et-tests.md).
+On déclare les modules dans **`lib.rs`** (la racine de la bibliothèque). Chaque nom correspond soit à un fichier `src/<nom>.rs`, soit à un **dossier** `src/<nom>/` contenant un `mod.rs`. Ce projet utilise la forme **dossier** (un dossier par module, avec des fichiers-feuilles courts) ; seul `error`, minuscule, reste un fichier unique. L'arbre complet et le pourquoi de la séparation lib/binaire sont dans [`../organisation-et-tests.md`](../organisation-et-tests.md).
 
 ```rust
 // dans src/lib.rs
-pub mod cli;    // ← charge src/cli.rs, et l'expose hors de la crate (tests/ inclus)
-pub mod url;    // ← charge src/url.rs
-pub mod error;  // ← charge src/error.rs
+pub mod cli;    // ← charge src/cli/mod.rs, et l'expose hors de la crate (tests/ inclus)
+pub mod url;    // ← charge src/url/mod.rs
+pub mod error;  // ← charge src/error.rs (module à fichier unique, pas de dossier)
 ```
 
 ```rust
@@ -155,13 +155,14 @@ Deux règles de visibilité :
 - Les champs d'une struct sont privés séparément : `pub struct Config { pub url: String }`.
 
 ```rust
-// dans src/cli.rs
+// dans src/cli/config.rs — les types
 pub struct Config { pub url: String, /* … */ }
 
+// dans src/cli/parse.rs — la logique
 pub fn parse(args: Vec<String>) -> Config { /* … */ }
 ```
 
-⚠️ **Piège classique** : vous créez `src/cli.rs` mais oubliez `pub mod cli;` dans `lib.rs`. **Symptôme** : `file not found for module` *ou* le fichier est tout bonnement ignoré et vous obtenez `cannot find function parse`. **Le fichier seul ne suffit pas : il faut le déclarer.**
+⚠️ **Piège classique** : vous créez `src/cli/mod.rs` mais oubliez `pub mod cli;` dans `lib.rs`. **Symptôme** : `file not found for module` *ou* le fichier est tout bonnement ignoré et vous obtenez `cannot find function parse`. **Le fichier seul ne suffit pas : il faut le déclarer.** (Même règle un cran plus bas : un `parse.rs` dans `src/cli/` n'existe pour la crate que si `cli/mod.rs` contient `pub mod parse;`.)
 
 ---
 

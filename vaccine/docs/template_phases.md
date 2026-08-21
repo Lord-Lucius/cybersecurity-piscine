@@ -20,7 +20,7 @@
 **Partie B — Les normes transverses**
 
 10. [La langue : où le français, où l'anglais](#10-la-langue--où-le-français-où-langlais)
-11. [La norme du pseudo-code](#11-la-norme-du-pseudo-code)
+11. [La norme de l'explication d'algorithme](#11-la-norme-de-lexplication-dalgorithme)
 12. [Ce qui reste en langage cible littéral](#12-ce-qui-reste-en-langage-cible-littéral)
 13. [Les blocs d'explication](#13-les-blocs-dexplication)
 14. [Les schémas](#14-les-schémas)
@@ -45,7 +45,7 @@ Copiez la **partie A** dans un nouveau fichier, remplacez les `[crochets]`, supp
 | Une section par fonction, dans l'ordre où on l'écrira | L'architecture d'ensemble — elle est dans le README |
 | Les décisions de conception et leurs raisons | Le contrat des API du socle — il est dans les sources |
 | Les pièges, avec leur symptôme | Le code final |
-| Du pseudo-code | Des corps de fonction dans le langage cible |
+| Le corps de chaque fonction, décrit en prose | Des corps de fonction en langage cible |
 
 **Le préfixe `to_delete_`** marque un document d'apprentissage, destiné à disparaître quand la personne qui apprenait connaît le sujet. Ce qui doit survivre remonte dans le README.
 
@@ -156,7 +156,7 @@ L'ordre suivant n'est **pas négociable au cas par cas** :
 4. 🧭 Quoi utiliser, et pourquoi                     (voir § 13)
 5. Les lignes de log — langage cible littéral
 6. Prototype — langage cible exact
-7. Corps — pseudo-code (voir § 11)
+7. Corps — l'algorithme décrit en prose (voir § 11)
 ```
 
 **Pourquoi cet ordre.** Qui descend directement au corps écrira ce qu'il aurait deviné de toute façon, et sautera précisément ce qui coûte des heures. Les pièges sont donc **au-dessus** du code, pas en dessous.
@@ -175,7 +175,7 @@ L'ordre suivant n'est **pas négociable au cas par cas** :
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
 | [la ligne] | [la famille d'API, la section de la boîte à outils] |
 
@@ -195,9 +195,7 @@ internal static XmlNode? NomDeLaFonction(AutomationElement element, ITreeWalker 
 
 **Corps**
 
-```
-[Pseudo-code selon le § 11.]
-```
+[L'algorithme décrit en prose, selon le § 11. Pas de bloc de code : des phrases qui nomment les vrais types et fonctions, dans l'ordre des étapes.]
 
 ---
 
@@ -235,40 +233,29 @@ Section distincte des pièges par concept du § 3 : ici, ce sont ceux qu'aucun c
 
 **Ce que le test doit prouver au-delà du comportement :** [Les règles contre-intuitives qu'un relecteur voudrait « simplifier ». C'est là qu'un test gagne sa place.]
 
-**Stratégie :** [Ce qu'il faut fabriquer pour appeler la fonction : un `XmlDocument`, un `Dictionary<…>`, un mock. Si la réponse est « un objet qui vient d'une application réelle », la fonction est **hors périmètre** — dites-le et rangez-la dans la liste du § 8.3.]
+**Stratégie :** [Ce qu'il faut fabriquer pour appeler la fonction : une chaîne, un `Vec`, une structure construite à la main. Si la réponse est « un objet qui vient d'une exécution réelle » (une vraie réponse HTTP, un vrai fichier), la fonction est **hors périmètre** — dites-le et rangez-la dans la liste du § 8.2.]
 
-```csharp
-public class [Nom]Tests
-{
-    // Fabriques private static en tête de classe.
-    private static NodeFacts Facts(string text, string type, string className) => new(text, type, className);
+**Les cas, en prose puis en tableau.** On ne **montre pas** le code de test (§ 11) : on **décrit** ce que chaque cas vérifie, puis on liste les couples entrée / attendu dans un tableau. Le lecteur en fait un `#[test]` (cas unique) ou une boucle sur un tableau de cas (jeu de valeurs).
 
-    [Theory]
-    //          entrée                      attendu
-    [InlineData("[valeur]",                 true)]
-    [InlineData("[valeur]",                 false)]   // [pourquoi ce cas existe]
-    public void Fonction_ComportementAttendu_QuandCondition(string entrée, bool attendu)
-    {
-        Assert.Equal(attendu, /* … */);
-    }
-}
-```
+| Entrée | Attendu | Pourquoi ce cas |
+|---|---|---|
+| `[valeur nominale]` | `[résultat]` | [le cas normal] |
+| `[valeur limite]` | `[résultat]` | [le cas contre-intuitif qui gagne sa place] |
 
 > **Norme des tests**
 >
 > | Élément | Convention |
 > |---|---|
-> | Nommage | `Fonction_ComportementAttendu_QuandCondition` |
-> | Un cas unique | `[Fact]` |
-> | Jeu de valeurs | `[Theory]` + `[InlineData]` |
-> | Fabriques | `private static` en tête de classe |
-> | Commentaires, y compris dans les `[InlineData]` | **anglais** (§ 10) |
+> | Emplacement | un module `#[cfg(test)]` en bas du fichier testé |
+> | Nommage | `fonction_comportement_attendu_quand_condition` (snake_case) |
+> | Fabriques | des fonctions locales en tête du module `tests`, **décrites** en prose, pas données |
+> | Commentaires que le lecteur recopiera | **anglais** (§ 10) |
 >
-> ⚠️ `[InlineData]` n'accepte que des **constantes de compilation**. Un objet, un tableau construit ou un appel de fonction imposent `[MemberData]`.
+> ⚠️ Chaque test est **autonome** : rien ne se transporte de l'un à l'autre. Si plusieurs cas partagent une préparation, décrivez une **fabrique** (une fonction qui la reconstruit à neuf), jamais une variable partagée entre tests.
 >
-> ⚠️ Chaque test est **autonome** : le framework construit une instance neuve de la classe par test. Rien ne se transporte d'un test au suivant.
+> ⚠️ Ce qui exige un serveur, un fichier réel ou un objet issu d'une vraie exécution est **hors périmètre unitaire** : rangez-le au § 8.2 et dites comment on le vérifie autrement.
 >
-> 💥 L'erreur commise : un squelette qui réutilisait une variable d'un test à l'autre comme si elle persistait. Correction : une fabrique qui rend un tuple, et la portée expliquée.
+> 💥 L'erreur commise : un squelette qui réutilisait une variable d'un test à l'autre comme si elle persistait. Correction : une fabrique décrite, et la portée expliquée.
 
 ### 8.2 Ce qui reste hors périmètre
 
@@ -307,10 +294,10 @@ La règle ne suit pas la langue de la conversation, mais **la nature de ce qu'on
 | Élément | Langue | Pourquoi |
 |---|---|---|
 | Prose explicative | **français** | C'est de la documentation pour un humain |
-| Pseudo-code | **anglais** | C'est la langue dans laquelle le code sera écrit |
-| Commentaires *dans* le pseudo-code | **anglais** | Ils seront recopiés tels quels dans le source |
+| Corps d'une fonction (le déroulé) | **français** | C'est de la prose désormais (§ 11), ce n'est plus du pseudo-code |
+| Prototypes | **anglais** | Langage cible littéral, recopié tel quel (§ 12) |
 | Lignes de log citées | **anglais** | Elles sont littérales, elles vont dans le code |
-| Commentaires des fichiers de test | **anglais** | C'est du code |
+| Commentaires cités que le lecteur recopiera | **anglais** | Ils finiront dans le source |
 | Titres, tableaux | **français** | Prose |
 
 **Le vocabulaire technique reste en anglais, même dans la prose française** : `walker`, `sibling`, `pattern`, `fallback`, `BOM`, `XmlWriter`, `record`, `playback`, `rescan`, `ConditionFactory`. Traduire n'aide personne et casse la correspondance avec le code.
@@ -321,113 +308,63 @@ La règle ne suit pas la langue de la conversation, mais **la nature de ce qu'on
 
 ---
 
-## 11. La norme du pseudo-code
+## 11. La norme de l'explication d'algorithme
 
-Pseudo-code structuré **à l'anglaise**. Ni du code recopiable, ni de la prose déguisée en code.
+Le corps d'une fonction se **décrit en prose**, jamais en code. Ni pseudo-code, ni Rust : des phrases françaises qui disent ce que la fonction fait, dans l'ordre, en nommant les vrais types et les vraies fonctions, mais sans jamais écrire une ligne qu'on puisse recopier.
 
 > [!IMPORTANT]
-> **Pourquoi pas le pseudo-code français en majuscules** (`FONCTION`, `TANT QUE`, `SI … ALORS`, `FIN SI`) ?
+> **Pourquoi la prose, et pas le pseudo-code.**
 >
-> Il a été essayé sur ce projet, puis abandonné : le décalage permanent avec le C# à écrire obligeait à traduire mentalement chaque ligne, et les mots-clés français n'ont pas d'équivalent direct (`FIN SI` contre l'accolade, `POUR … FAIRE` contre `foreach`). La structure de contrôle en anglais **est** celle du langage cible ; c'est une correspondance de moins à faire.
+> Le pseudo-code, même « à l'anglaise », restait trop proche du Rust à écrire : le lecteur le recopiait au lieu de le comprendre, et la frontière « ce qu'on montre / ce qu'on cache » dérivait à chaque section. La prose force la traduction — comprendre pour écrire — et supprime la tentation du copier-coller. Le seul code littéral qui subsiste est le **prototype** (§ 12) : le contrat, pas l'algorithme.
 
-### 11.1 La syntaxe
+### 11.1 Ce que la prose montre, et ce qu'elle cache
 
-| Élément | Convention |
-|---|---|
-| En-tête | `NomFonction(param : Type, …) -> TypeRetour:` |
-| Contrôle | `if` · `else if` · `else` · `for each … in …` · `while` · `try` · `catch` · `return` |
-| Blocs | un `:` ouvre, l'**indentation** ferme. Aucun marqueur de fin, jamais de `end` ni de `FIN` |
-| Affectation | `=` |
-| Type | annoté par `:` sur la **première** affectation seulement |
-| Commentaires | `//`, en anglais |
-| Renvoi vers une autre fonction du document | `→ F2 · LiveFacts`, aligné à droite |
-| Renvoi vers une ligne de log | `log ①` |
+**Elle montre les vrais noms.** Types, champs, variantes d'enum, noms des fonctions à écrire. Les connaître est nécessaire et ne dispense de rien : savoir qu'il faut appeler `similar` n'apprend pas à l'écrire.
 
-### 11.2 Le vocabulaire des valeurs
+**Elle cache le code.** Pas de `if`, pas de `for`, pas de `return`, aucun appel écrit tel `x.foo(y)`. Une opération se **nomme et se décrit** : « comparer les deux réponses avec le comparateur `similar` » plutôt que la ligne d'appel. Le lecteur sait **quoi** faire et **ce que ça doit produire** ; écrire l'appel, choisir les paramètres, implémenter, restent son travail.
+
+### 11.2 Les structures de données : décrites, pas données
+
+Un `struct`, un `enum`, une table de constantes ne se **donnent pas** en Rust. On dit **quels champs** il porte, **quelles variantes** il liste, **pourquoi**, et à quoi chacun sert. Le lecteur écrit la déclaration lui-même à partir de cette description.
+
+> Exemple. Au lieu de donner `enum Verdict { Safe, Vulnerable { … } }`, on écrit : « le verdict est un enum à deux cas — *sûr*, sans donnée, et *vulnérable*, qui **porte** le paramètre touché, la méthode, la technique gagnante et le payload. Coller la preuve à la variante évite un `bool` accompagné de variables éparses (voir [`rust/02`](rust/02-structurer-le-code.md) § 2). »
+
+### 11.3 Le vocabulaire des valeurs
+
+En prose française, mais avec des mots précis empruntés au domaine :
 
 | Écrire | Plutôt que | Signifie |
 |---|---|---|
-| `absent` | `null` | absence de valeur |
-| `is empty` / `is set` | `.Length == 0` | chaîne vide ou non |
-| `no opinion` | `null` | abstention d'un hook à trois réponses |
-| `continue` / `break` | — | itération suivante / sortie de boucle |
+| *absent* / renvoie *absent* | `null` | absence de valeur (`Option::None`) |
+| la chaîne est *vide* / est *renseignée* | `.len() == 0` | chaîne vide ou non |
+| l'*itération suivante* / *sortir de la boucle* | `continue` / `break` | contrôle de boucle, nommé |
+| renvoie *vrai* / renvoie *faux* | `return true / false` | la valeur produite, dite en clair |
 
-La distinction `absent` / `is empty` n'est pas cosmétique : dans ce plugin, « voisin absent » et « voisin présent mais sans texte » suivent deux règles différentes. Le pseudo-code doit pouvoir les dire séparément.
+La distinction **absent** / **vide** n'est pas cosmétique : « paramètre absent » et « paramètre présent mais sans valeur » suivent parfois deux règles différentes. La prose doit pouvoir les dire séparément.
 
-### 11.3 Un exemple qui porte toutes les conventions
+### 11.4 Un exemple qui porte la norme
 
-```
-FindDescribedComponent(element : AutomationElement, walker : ITreeWalker,
-                       windowNode : XmlNode) -> XmlNode?:
+Pour une fonction dont le prototype `similar(a, b, tolerance) -> bool` est donné à part, le corps se décrit ainsi :
 
-    live : Signature = signature of the live element and its neighbourhood   → F3 · FromLiveElement
-    if live.Self.Text is empty:
-        return absent                                            // nothing to recognise on
+> **Déroulé.** On tranche d'abord sur le statut HTTP : si les deux réponses n'ont pas le même code, ce n'est pas la même page — on renvoie *faux* sans même lire les corps. Sinon, on retient la plus grande des deux longueurs de corps ; si elle est nulle (deux corps vides), les réponses sont identiques, on renvoie *vrai*. Autrement, on rapporte l'écart absolu des longueurs à cette plus grande longueur, et on renvoie *vrai* tant que ce ratio reste sous la `tolerance`.
 
-    candidates : XmlNodeList? = every <composant> located UNDER this window node
-    if candidates is absent or candidates is empty:
-        return absent
+Relevez : **les noms réels** (`status`, `tolerance`, « corps »), **l'ordre des décisions** — statut avant longueur, avec le pourquoi implicite : un statut différent tranche sans lire le corps — et **aucune ligne recopiable** : pas un `if`, pas un `.len()`.
 
-    best : XmlNode? = absent
-    bestScore : int = -1
-    bestIsHidden : bool = false
-
-    for each candidate in candidates:
-        if not SelfMatches(live.Self, facts of the candidate):    → F2 · DescribedFacts
-            continue
-
-        described : Signature = signature of the candidate node   → F3 · FromDescribedNode
-        // ONE call, TWO answers: the verdict by return value, the count by out parameter
-        if not AreNeighborhoodsSimilar(live, described, out agreements : int):
-            continue
-
-        if agreements > bestScore
-           or (agreements == bestScore and bestIsHidden and the candidate is visible):
-            best = candidate
-            bestScore = agreements
-            bestIsHidden = the candidate is not visible
-
-    log ③
-    return best
-```
-
-Relevez, dans ce bloc :
-
-- **les types sont annotés une fois**, à la première affectation — `bestScore : int = -1`, puis `bestScore = agreements` sans répéter le type ;
-- **le `?` de `XmlNode?` et de `candidates`** dit exactement où un test d'absence est obligatoire ;
-- **les noms réels apparaissent** : `Signature`, `live.Self.Text`, `SelfMatches`, `AreNeighborhoodsSimilar` ;
-- **les appels n'apparaissent pas** : « signature of the live element » est une *description*, avec le nom de la fonction en annotation à droite ;
-- **`out agreements : int`** est écrit dans l'appel, parce que la double sortie est le point subtil de cette fonction ;
-- **le commentaire signale la double sortie** en anglais, tel qu'il finira dans le source.
-
-### 11.4 Ce que le pseudo-code montre, et ce qu'il cache
-
-**Il montre les noms réels.** Types, champs, membres d'énumération, noms des fonctions à écrire. Les connaître est nécessaire et ne dispense de rien : savoir qu'il faut appeler `SelfMatches` n'apprend pas à l'écrire.
-
-**Il cache les appels et les chemins d'API.** L'opération est **décrite** :
-
-```
-live : NodeFacts = facts of the live element              → F2 · LiveFacts
-```
-
-Le lecteur sait **quoi** appeler et **ce que ça doit produire**. Écrire l'appel, choisir les paramètres et implémenter restent son travail.
+Un renvoi vers une autre fonction du document se met en **fin de phrase**, comme avant : « … avec le comparateur `similar` (→ § 5.1) ». Un renvoi vers une ligne de log garde la forme `log ①`.
 
 > [!CAUTION]
-> **Une opération = une ligne.** Si un appel rend deux choses, écrivez-le sur une ligne avec un commentaire, comme le `AreNeighborhoodsSimilar` ci-dessus.
->
-> 💥 C'est l'erreur la plus coûteuse commise sur ce projet : cet appel avait été coupé en deux lignes — le compteur d'un côté, le verdict de l'autre. Le lecteur a cherché une fonction qui n'existait pas.
+> **Une opération = une phrase.** Si un appel rend deux choses (un verdict *et* un compteur), dites-le dans **une** phrase : « … rend le verdict, et par un paramètre de sortie le nombre d'accords ». Le couper en deux fait chercher au lecteur une fonction qui n'existe pas — l'erreur la plus coûteuse de l'ancien pseudo-code, qu'on ne réintroduit pas en prose.
 
-### 11.5 Les trois dérives, et où est le curseur
+### 11.5 Le dosage : les deux dérives
 
-💥 Trois versions ont été écrites avant celle-ci, dans cet ordre :
-
-| Dérive | Symptôme | Verdict |
+| Dérive | Symptôme | Correction |
 |---|---|---|
-| **Trop proche du code** — `element.Properties.Name.ValueOrDefault` en clair | Le lecteur recopie au lieu de chercher | *« c'est trop proche de ce que je dois faire, je vais quasi rien faire »* |
-| **Trop maigre** — « préparer trois emplacements », sans type | On ne sait pas quoi écrire | Illisible |
-| **Français scolaire** — `DEBUT` / `SI … ALORS` / `FIN SI` | Décalage constant avec le code à écrire | Abandonné (§ 11) |
+| **Trop proche du code** — la prose décalque le Rust ligne à ligne (« si le statut est différent, retourner false ») | Le lecteur recopie mentalement, n'apprend rien | Décrire l'**intention** et l'**ordre**, pas la syntaxe |
+| **Trop vague** — « comparer les réponses et décider » | On ne sait pas quoi écrire | Nommer les signaux comparés, l'ordre, le critère chiffré (la tolérance) |
 
-Le curseur est au milieu : **la structure de contrôle en anglais et les types sont donnés, les chemins d'API ne le sont pas.**
+Le curseur est au milieu : **l'intention, l'ordre des étapes et les vrais noms sont donnés ; la syntaxe et les appels ne le sont pas.**
+
+> 💥 La convention de cette section a changé **cinq fois** — français scolaire (`SI … ALORS`), schéma anglais terse, français d'intention, pseudo-code anglais structuré, puis cette prose. Chaque bascule a coûté une passe sur toutes les sections de tous les documents. Si vous hésitez sur une forme, tranchez sur **une** section, comparez, et seulement ensuite propagez (§ 18).
 
 ---
 
@@ -435,13 +372,13 @@ Le curseur est au milieu : **la structure de contrôle en anglais et les types s
 
 Trois catégories, et seulement trois.
 
-**Les prototypes.** Ce sont des contrats — ce qui entre, ce qui sort. Se tromper de signature coûte du temps pour rien, et il n'y a rien à apprendre en la devinant. Dans un **bloc séparé**, balisé (```csharp), placé **avant** le pseudo-code de logique.
+**Les prototypes.** Ce sont des contrats — ce qui entre, ce qui sort. Se tromper de signature coûte du temps pour rien, et il n'y a rien à apprendre en la devinant. Dans un **bloc séparé**, balisé (```rust), placé **avant** le corps en prose.
 
 **Les lignes de log.** Ce sont des données de sortie, pas de l'algorithmique — et surtout des **repères de calibration**. Si le lecteur en écrit une variante, les instructions de vérification qui disent « cherchez `agreements=` dans les logs » ne fonctionnent plus. Elles doivent donc être identiques, donc données à coller.
 
 **Les expressions régulières.** Ce sont des données. Leur mécanique et leurs tableaux de couverture vont dans le README ; le document donne les motifs littéralement.
 
-⚠️ **Tout le reste est du pseudo-code.** Y compris les corps d'une ligne, y compris les constructeurs triviaux — sinon la frontière devient une affaire de jugement, et elle dérive.
+⚠️ **Tout le reste est de la prose.** Y compris les corps d'une ligne, y compris les structures de données et les constructeurs triviaux (§ 11.2) — sinon la frontière devient une affaire de jugement, et elle dérive.
 
 ---
 
@@ -524,7 +461,7 @@ Un schéma ASCII vaut mieux qu'un paragraphe dans trois situations, et il faut l
 | Tableau | Colonnes | Quand |
 |---|---|---|
 | Décisions | `Décision \| Pourquoi` | Chaque fonction dont la forme aurait pu être autre |
-| Quoi utiliser | `Ce que dit le pseudo-code \| Où trouver comment` | Quand plusieurs lignes demandent des API différentes |
+| Quoi utiliser | `Ce que fait l'algorithme \| Où trouver comment` | Quand plusieurs lignes demandent des API différentes |
 | À lire avant | `Fichier \| Pourquoi le lire` | En tête de chaque fichier source |
 | Hors périmètre | `Fonction \| Pourquoi \| Comment on vérifie` | § 8.2 |
 
@@ -563,7 +500,9 @@ Quatre contrôles attrapent l'essentiel des dérives, sans relire le document.
 > [!IMPORTANT]
 > **Le code est la vérité, pas le document.** Quand les deux divergent, alignez le document — sauf si le document décrit une conception que le code a mal implémentée, ce qui arrive et se voit précisément à ce moment-là.
 
-**Les invariants de structure.** Compter les blocs `**Prototype**` et `**Corps**` : ils s'apparient, à l'exception des types de données qui ont un prototype sans corps. Vérifier qu'aucun bloc `🧭` ou `Prototype` n'apparaît **après** le `Corps` de sa propre section — contrôle **par section**, pas global, sinon chaque section est comparée à la précédente.
+**Les invariants de structure.** Compter les blocs `**Prototype**` et `**Corps**` : ils s'apparient (une fonction = un prototype + un corps en prose). Les structures de données, elles, n'ont **ni** prototype **ni** bloc de code : elles sont décrites (§ 11.2). Vérifier qu'aucun bloc `🧭` ou `Prototype` n'apparaît **après** le `Corps` de sa propre section — contrôle **par section**, pas global, sinon chaque section est comparée à la précédente.
+
+**Les blocs de code résiduels.** Le seul code en langage cible autorisé est le **prototype**, les **lignes de log** et les **regex** (§ 12) — plus les commandes shell et les schémas. Tout autre bloc \`\`\` — surtout à l'intérieur d'un `Corps` — est du pseudo-code oublié : à convertir en prose (§ 11).
 
 **Les comptes cités dans la prose.** Grep les formulations du type « les cinq familles », « les trois documents », « les 7 membres », et vérifier qu'elles tiennent encore. 💥 « Les cinq familles » est resté après l'ajout d'un sixième motif.
 
@@ -573,7 +512,9 @@ Quatre contrôles attrapent l'essentiel des dérives, sans relire le document.
 
 | Erreur | Conséquence | La règle qui en découle |
 |---|---|---|
-| Un appel coupé en deux lignes de pseudo-code | Le lecteur cherche une fonction qui n'existe pas | Une opération = une ligne. Si elle rend deux choses, dites-le en commentaire |
+| Une opération coupée en deux phrases | Le lecteur cherche une fonction qui n'existe pas | Une opération = une phrase (§ 11.4). Si elle rend deux choses, dites-le dans la même phrase |
+| Un corps donné en code au lieu d'être décrit | Le lecteur recopie, n'apprend rien | Le corps est de la prose ; seul le prototype est littéral (§ 11, § 12) |
+| Un `struct`/`enum` donné tel quel | Rien à comprendre, tout à copier | Décrire champs et variantes, laisser écrire la déclaration (§ 11.2) |
 | Une variable déclarée dans une section, utilisée dans la suivante | Illusion de portée partagée | Chaque bloc autonome redéclare le nécessaire |
 | Du vocabulaire employé sans définition | Le lecteur doit demander | Lexique en § 3.3, et rien d'employé qui n'y soit |
 | Des explications qui donnent la réponse | Rien n'est appris | Expliquer pourquoi, laisser chercher comment |
@@ -586,6 +527,6 @@ Quatre contrôles attrapent l'essentiel des dérives, sans relire le document.
 | Changer de convention en cours de route | Une passe complète sur toutes les sections | Trancher la forme **avant** d'écrire |
 
 > [!TIP]
-> Le dernier point est celui qui coûte le plus cher. Le pseudo-code de ce projet a changé de convention **quatre fois** — français scolaire, schéma anglais terse, français d'intention, puis anglais structuré. Chaque changement a demandé une passe sur une quarantaine de sections.
+> Le dernier point est celui qui coûte le plus cher. La façon de décrire un algorithme dans ce projet a changé **cinq fois** — français scolaire, schéma anglais terse, français d'intention, pseudo-code anglais structuré, puis la prose française actuelle. Chaque changement a demandé une passe sur une quarantaine de sections, dans tous les documents.
 >
 > Si vous hésitez sur une forme, convertissez **une seule section** dans chaque candidate et comparez-les côte à côte. Dix minutes contre plusieurs heures.

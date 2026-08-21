@@ -69,17 +69,17 @@ Documentation :
 
 | Terme | Ce qu'il désigne | Où ça vit |
 |---|---|---|
-| base | l'URL sans la query string | [`src/url.rs`](../../src/url.rs) — `Target::base` |
+| base | l'URL sans la query string | [`src/url/model.rs`](../../src/url/model.rs) — `Target::base` |
 | query string | la partie après `?` | `url::parse` |
-| `Param` | une paire `key`/`value` d'un paramètre | `src/url.rs` |
-| `Target` | la base + tous les `Param`, reconstructible | `src/url.rs` |
+| `Param` | une paire `key`/`value` d'un paramètre | `src/url/model.rs` |
+| `Target` | la base + tous les `Param`, reconstructible | `src/url/model.rs` |
 | inject | reconstruire l'URL avec un `Param` modifié | `Target::with_injected` |
 
 ---
 
 ## 4. Décomposition des étapes
 
-1. **Types** — `Param { key, value }` et `Target { base, params }` dans `src/url.rs`.
+1. **Types** — `Param { key, value }` et `Target { base, params }` dans `src/url/model.rs`.
 2. **`parse`** — URL string → `Target`.
 3. **`with_injected`** — rendre l'URL string avec un paramètre remplacé.
 
@@ -116,11 +116,11 @@ Documentation :
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
-| `split url on first '?'` | `split_once('?')` → rend `Option`, gère l'absence de query |
-| `for each pair in query split on '&'` | `.split('&')` |
-| `split pair on first '='` | `split_once('=')` — protège les valeurs contenant `=` (§ 3.2) |
+| découper l'URL au premier `?` | `split_once('?')` → rend `Option`, gère l'absence de query |
+| parcourir les paires de la query | `.split('&')` |
+| découper une paire au premier `=` | `split_once('=')` — protège les valeurs contenant `=` (§ 3.2) |
 
 **Prototype**
 
@@ -130,21 +130,7 @@ pub fn parse(url: &str) -> Target;
 
 **Corps**
 
-```
-parse(url : &str) -> Target:
-
-    (base, query) : (&str, Option<&str>) = split url on first '?'   // None query if no '?'
-
-    params : Vec<Param> = empty
-    if query is set and query is not empty:
-        for each pair in query split on '&':
-            if pair is empty:
-                continue
-            (key, value) : (&str, &str) = split pair on first '='   // value = "" if no '='
-            params.push(Param { key, value })
-
-    return Target { base, params }
-```
+**Déroulé.** On découpe l'URL au **premier** `?` : à gauche la base, à droite la query — qui peut être *absente* s'il n'y a pas de `?`. On prépare une liste de `Param` vide. Si la query est présente et non vide, on la découpe sur chaque `&` ; pour chaque morceau, on ignore les segments *vides*, sinon on le coupe au **premier** `=` — la clé à gauche, la valeur à droite, cette dernière valant la chaîne vide s'il n'y a pas de `=` — et on ajoute le `Param` correspondant à la liste. On rend enfin le `Target` fait de la base et de cette liste de paramètres.
 
 ### 5.2 · `with_injected`
 
@@ -159,11 +145,11 @@ parse(url : &str) -> Target:
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
-| `rebuild each pair as key=value` | `format!("{}={}", p.key, chosen_value)` |
-| `join pairs with '&'` | `.collect::<Vec<_>>().join("&")` |
-| `stitch base and query` | `format!("{base}?{query}")` |
+| reconstruire chaque paire `clé=valeur` | `format!("{}={}", p.key, valeur_choisie)` |
+| joindre les paires par `&` | `.collect::<Vec<_>>().join("&")` |
+| recoller base et query | `format!("{base}?{query}")` |
 
 *Troisième temps :* on reconstruit **tous** les params, en substituant la valeur seulement pour celui dont la clé correspond. Reconstruire tout — plutôt que « patcher » une sous-chaîne dans l'URL d'origine — évite les faux positifs de remplacement (imaginez `id` présent aussi dans `path`). La source de vérité est la liste `params`, pas la chaîne originale.
 
@@ -175,17 +161,7 @@ pub fn with_injected(&self, target_key: &str, payload: &str) -> String;
 
 **Corps**
 
-```
-with_injected(self, target_key : &str, payload : &str) -> String:
-
-    pairs : Vec<String> = empty
-    for each p in self.params:
-        value : &str = if p.key == target_key then payload else p.value
-        pairs.push(format "key=value" for p.key and value)
-
-    query : String = pairs joined with "&"
-    return format "base?query"
-```
+**Déroulé.** On reconstruit la query paire par paire à partir de la liste `params` — jamais de la chaîne d'origine. Pour chaque `Param`, la valeur émise est le `payload` si sa clé est celle qu'on injecte, et sa valeur d'origine sinon ; on formate `clé=valeur`. On joint toutes ces paires par `&`, puis on recolle la base et cette query pour rendre l'URL complète.
 
 ---
 
@@ -198,7 +174,7 @@ with_injected(self, target_key : &str, payload : &str) -> String:
 
 ## 7. Tests unitaires
 
-### 7.1 `src/url.rs` — module `#[cfg(test)]`
+### 7.1 `src/url/parse.rs` — module `#[cfg(test)]`
 
 **Ce que tu testes :**
 - URL avec deux params → `params.len() == 2`, clés et valeurs correctes.
@@ -208,40 +184,22 @@ with_injected(self, target_key : &str, payload : &str) -> String:
 
 **Ce que le test doit prouver au-delà du comportement :** que `with_injected` **ne touche pas** aux autres paramètres, et que `split_once('=')` préserve les `=` dans la valeur. Deux règles qu'un « nettoyage » casserait.
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+**Stratégie.** Aucun réseau : `parse` prend une `&str` et `with_injected` rend une `String`. On appelle directement avec des URLs littérales et on vérifie le `Target` obtenu, ou la chaîne réémise.
 
-    #[test]
-    fn parses_two_params() {
-        let t = parse("http://h/p?id=1&cat=books");
-        assert_eq!(t.params.len(), 2);
-        assert_eq!(t.params[0].key, "id");
-        assert_eq!(t.params[1].value, "books");
-    }
+**Les cas à vérifier** (chacun devient un `#[test]`) :
 
-    #[test]
-    fn value_keeps_inner_equals() {
-        let t = parse("http://h/p?token=a=b");
-        assert_eq!(t.params[0].value, "a=b");
-    }
-
-    #[test]
-    fn inject_touches_only_target() {
-        let t = parse("http://h/p?id=1&cat=books");
-        let url = t.with_injected("id", "X");
-        assert!(url.contains("id=X"));
-        assert!(url.contains("cat=books"));   // untouched
-    }
-}
-```
+| Entrée | Attendu | Pourquoi ce cas |
+|---|---|---|
+| `parse("http://h/p?id=1&cat=books")` | deux `Param` : clé `id`, seconde valeur `books` | le cas nominal, deux paramètres |
+| `parse("http://h/")` | `params` vide | une URL sans query reste valide |
+| `parse("http://h/p?token=a=b")` | `value == "a=b"` | `split_once('=')` préserve les `=` internes |
+| `with_injected("id", "X")` sur `?id=1&cat=books` | l'URL contient `id=X` **et** `cat=books` intact | l'injection ne touche qu'à la cible |
 
 ### 7.3 Résultats attendus
 
-- `parses_two_params` : PASS
-- `value_keeps_inner_equals` : PASS
-- `inject_touches_only_target` : PASS
+- deux paramètres parsés, clés/valeurs correctes : PASS
+- valeur avec `=` interne préservée : PASS
+- injection isolée (`cat` intact) : PASS
 
 ---
 

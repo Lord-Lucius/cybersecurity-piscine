@@ -66,21 +66,21 @@ Le flux, de l'argument de ligne de commande jusqu'au fichier de résultats :
 
 ### Découpage en modules
 
-Un fichier = un module, dans `src/`. C'est la granularité recommandée pour ce projet :
+Un **dossier** = un module, dans `src/`, avec des fichiers-feuilles courts (types d'un côté, logique de l'autre). C'est la granularité retenue — l'arbre complet est dans [`organisation-et-tests.md`](organisation-et-tests.md) :
 
 | Module | Fichier | Responsabilité |
 |---|---|---|
-| `cli` | `src/cli.rs` | parser `argv` → `Config` |
-| `url` | `src/url.rs` | parser l'URL cible → `Target` + ses `Param` |
-| `http` | `src/http.rs` | envoyer une requête, rendre une `Response` |
-| `scanner` | `src/scanner.rs` | orchestrer techniques × paramètres |
-| `techniques` | `src/techniques.rs` | `error_based`, `boolean_based` |
-| `engine` | `src/engine.rs` | fingerprint du moteur SQL |
-| `extract` | `src/extract.rs` | schéma + dump |
-| `report` | `src/report.rs` | affichage + sauvegarde |
+| `cli` | `src/cli/` | parser `argv` → `Config` |
+| `url` | `src/url/` | parser l'URL cible → `Target` + ses `Param` |
+| `http` | `src/http/` | envoyer une requête, rendre une `Response` |
+| `scanner` | `src/scanner/` | orchestrer techniques × paramètres |
+| `techniques` | `src/techniques/` | `error_based`, `boolean_based` |
+| `engine` | `src/engine/` | fingerprint du moteur SQL |
+| `extract` | `src/extract/` | schéma + dump |
+| `report` | `src/report/` | affichage + sauvegarde |
 | `error` | `src/error.rs` | le type d'erreur du projet |
 
-> Voir [`rust/02-structurer-le-code.md`](rust/02-structurer-le-code.md) pour *comment* un `mod` devient un fichier, et [`organisation-et-tests.md`](organisation-et-tests.md) pour l'arbre complet, la séparation bibliothèque/binaire et l'emplacement des tests.
+> Voir [`rust/02-structurer-le-code.md`](rust/02-structurer-le-code.md) pour *comment* un `mod` devient un dossier (`mod.rs` + feuilles), et [`organisation-et-tests.md`](organisation-et-tests.md) pour l'arbre complet, la séparation bibliothèque/binaire et l'emplacement des tests.
 
 ---
 
@@ -95,7 +95,7 @@ Le template le dit (§ 18) : changer de convention en cours de route coûte une 
 | Gestion d'erreur | un **enum `VaccineError`** + `Result<T, VaccineError>` partout | messages clairs, `?` propre, pas de `unwrap()` dans le chemin principal |
 | Comparaison de réponses | sur le **corps** + le **code HTTP** + la **longueur** | un seul de ces trois signaux suffit rarement ; les trois ensemble discriminent |
 | Langue | prose FR, code/logs/commentaires EN | c'est la règle du [template](template_phases.md) § 10 |
-| Pseudo-code | anglais structuré (§ 11 du template) | correspond au Rust à écrire, une traduction de moins |
+| Corps des fonctions | **décrit en prose FR**, pas de code (§ 11 du template) | comprendre pour écrire ; le seul code littéral est le prototype (§ 12) |
 
 > [!CAUTION]
 > **Ne pas partir sur `reqwest` + `tokio` « parce que c'est le standard ».** L'`async` en Rust est un sujet à part entière (`Future`, `.await`, runtime, `Pin`). Pour un scanner séquentiel il n'apporte rien et ajoute des heures de compréhension. `ureq` fait exactement le même travail en synchrone. Le jour où le parallélisme devient un bonus, on ajoute des threads `std::thread`, pas un runtime async.
@@ -137,9 +137,13 @@ Documents détaillés (niveau fonction, façon template) :
 | 2 | [phase-02-url-et-parametres.md](phases/phase-02-url-et-parametres.md) | rédigé |
 | 3 | [phase-03-client-http.md](phases/phase-03-client-http.md) | rédigé |
 | 4 | [phase-04-detection.md](phases/phase-04-detection.md) | rédigé |
-| 5 → 9 | [phases/README.md](phases/README.md) | esquissées, à détailler quand on y arrive |
+| 5 | [phase-05-fingerprint.md](phases/phase-05-fingerprint.md) | rédigé |
+| 6 | [phase-06-extraction-schema.md](phases/phase-06-extraction-schema.md) | rédigé |
+| 7 | [phase-07-dump.md](phases/phase-07-dump.md) | rédigé |
+| 8 | [phase-08-stockage.md](phases/phase-08-stockage.md) | rédigé |
+| 9 | [phase-09-tests-environnement.md](phases/phase-09-tests-environnement.md) | rédigé |
 
-Les esquisses des phases 5 à 9 donnent l'objectif, les concepts et les payloads clés — assez pour ne pas se perdre, pas assez pour coder à l'aveugle. On les promeut en document complet **au moment de les attaquer**, pas avant : un document de phase écrit trop tôt vieillit avant d'être lu.
+Les neuf documents sont désormais rédigés au niveau des fonctions. Chaque corps de fonction y est **décrit en prose** (plus de pseudo-code) ; seuls les prototypes et les lignes de log restent en Rust littéral (template § 11-12).
 
 ---
 
@@ -157,4 +161,4 @@ Ce projet est aussi une porte d'entrée dans le langage. Trois fiches, à lire d
 
 ## 6. Rappel de cadre légal
 
-`vaccine` ne se teste **que** sur des cibles volontairement vulnérables et sur lesquelles on a l'autorisation explicite : DVWA, SQLi-Labs, bWAPP, ou une appli PHP montée pour l'occasion en local. Le sujet est clair là-dessus (§ « Sécurité et limites ») et c'est aussi la seule posture défendable. On monte l'environnement de test à la [phase 9](phases/README.md).
+`vaccine` ne se teste **que** sur des cibles volontairement vulnérables et sur lesquelles on a l'autorisation explicite : DVWA, SQLi-Labs, bWAPP, ou une appli PHP montée pour l'occasion en local. Le sujet est clair là-dessus (§ « Sécurité et limites ») et c'est aussi la seule posture défendable. On monte l'environnement de test à la [phase 9](phases/phase-09-tests-environnement.md).

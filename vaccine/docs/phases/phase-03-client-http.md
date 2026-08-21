@@ -76,7 +76,7 @@ Documentation :
 
 | Terme | Ce qu'il désigne | Où ça vit |
 |---|---|---|
-| `Response` | notre type : `status: u16` + `body: String` | [`src/http.rs`](../../src/http.rs) |
+| `Response` | notre type : `status: u16` + `body: String` | [`src/http/response.rs`](../../src/http/response.rs) |
 | agent | le client `ureq` réutilisable (connexion, timeout) | `http::Client` |
 | `Status` | variante d'erreur `ureq` pour un 4xx/5xx | `http::send` |
 | `Transport` | variante d'erreur `ureq` réseau (fatal) | `http::send` |
@@ -128,11 +128,11 @@ Documentation :
 
 **🧭 Quoi utiliser, et pourquoi**
 
-| Ce que dit le pseudo-code | Où trouver comment |
+| Ce que fait l'algorithme | Où trouver comment |
 |---|---|
-| `perform the request for this method` | `agent.get(...).call()` / `agent.post(...).send_form(...)` |
-| `on Status keep the response` | `match` sur `ureq::Error::Status(code, resp)` |
-| `read the body as string` | `.into_string()?` — consomme la réponse |
+| exécuter la requête selon la méthode | `agent.get(...).call()` / `agent.post(...).send_form(...)` |
+| sur `Status`, garder la réponse | `match` sur `ureq::Error::Status(code, resp)` |
+| lire le corps en `String` | `.into_string()?` — consomme la réponse |
 
 *Troisième temps :* on lit le corps **après** avoir résolu le `match`, sur la réponse retenue (qu'elle vienne de `Ok` ou de `Status`). Lire le corps *dans* chaque branche dupliquerait l'appel ; unifier les deux branches sur une même variable `resp`, puis lire une fois, garde une seule source de corps.
 
@@ -154,28 +154,7 @@ pub fn send(&self, method: &HttpMethod, url: &str, form: &[(&str, &str)])
 
 **Corps**
 
-```
-send(self, method : &HttpMethod, url : &str, form : &[(&str, &str)])
-    -> Result<Response, VaccineError>:
-
-    log ①                                          // "[http] -> METHOD url"
-
-    result : Result<ureq::Response, ureq::Error> =
-        match method:
-            Get  => self.agent.get(url).call()
-            Post => self.agent.post(url).send_form(form)
-
-    resp : ureq::Response = match result:
-        Ok(r)                          => r
-        Err(Status(_code, r))          => r         // error page is DATA, keep it
-        Err(Transport(t))              => return Err(Http from t)
-
-    status : u16 = resp.status()
-    body   : String = resp.into_string()?          // consumes resp, once
-
-    log ②                                          // "[http] <- status N, M bytes"
-    return Ok(Response { status, body })
-```
+**Déroulé.** On journalise d'abord la requête sortante (log ①). On lance ensuite la requête selon la méthode : un GET sur l'URL, ou un POST du formulaire `form` — les deux rendent le `Result` de `ureq`. On résout ce résultat en une réponse `ureq` : sur `Ok`, on la garde ; sur une erreur `Status`, on garde **quand même** la réponse qu'elle transporte, car une page d'erreur HTTP est une donnée ; sur une erreur `Transport`, on remonte au contraire une `VaccineError::Http`, c'est une vraie panne réseau. De la réponse retenue, on lit le statut, puis le corps en `String` — une seule fois, `into_string` consommant la réponse. On journalise la réponse (log ②) et on rend la `Response` faite de ce statut et de ce corps.
 
 ### 5.2 · `Client::new`
 
@@ -189,11 +168,7 @@ pub fn new() -> Client;
 
 **Corps**
 
-```
-new() -> Client:
-    agent : ureq::Agent = build a ureq agent with a 10s timeout
-    return Client { agent }
-```
+**Déroulé.** Construire un agent `ureq` configuré avec un timeout de 10 s, et le ranger dans le `Client` rendu. C'est cet agent réutilisé qui évite de rétablir connexion et timeout à chaque requête (il y en aura des centaines).
 
 ---
 
@@ -234,7 +209,7 @@ make            # compile avec la nouvelle dépendance
 
 ### 8.3 Résultats attendus (test manuel)
 
-Contre un labo local (voir [phase 9](README.md) pour le monter) :
+Contre un labo local (voir [phase 9](phase-09-tests-environnement.md) pour le monter) :
 
 ```bash
 make run ARGS='"http://localhost/vulnerable.php?id=1"'

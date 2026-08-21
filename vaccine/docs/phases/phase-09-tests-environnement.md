@@ -161,6 +161,21 @@ On **décrit** les scénarios (norme § 8) ; le code de test se déduit du table
 | dump + cible sans UNION | des lignes d'un côté, un dump vide **sans** panique de l'autre |
 | scan POST (`-X POST`) | même détection que GET, paramètres dans le corps |
 
+### 5.4 · Le câblage de `main` : déjà figé
+
+**Ce qu'il doit accomplir :** rien — et c'est le point. `main` a pris sa forme **définitive** à la [phase 8](phase-08-stockage.md) § 5.4 (lire la `Config`, appeler `scanner::run`, `render` sur `stdout`, `save` si `-o`). Cette phase ne le recâble pas : les tests d'intégration le lancent **tel quel**, en boîte noire.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| tester `main` par le **binaire**, pas en l'appelant | un test d'intégration vérifie l'outil tel que l'utilisateur le lance (§ 3.2) |
+| ne rien ajouter à `main` ici | tout est déjà branché ; la phase 9 **observe**, elle ne construit plus |
+
+**Corps**
+
+**Déroulé.** Aucun code de câblage à écrire. Les scénarios du § 5.3 exécutent le binaire `vaccine` via le helper (§ 5.2), lui passent des arguments (URL, `-X POST`, `-o`) et inspectent sa sortie — `stdout` (le rapport rendu par `render`), `stderr` (les logs) et le code de retour. `main` est ainsi couvert **de bout en bout**, sans être ré-ouvert.
+
 ---
 
 ## 6. Pièges spécifiques à cette phase

@@ -82,6 +82,7 @@ Documentation :
 1. **Types** — `Param { key, value }` et `Target { base, params }` dans `src/url/model.rs`.
 2. **`parse`** — URL string → `Target`.
 3. **`with_injected`** — rendre l'URL string avec un paramètre remplacé.
+4. **Câblage** — `main` affiche (temporairement) le `Target` de l'URL.
 
 ---
 
@@ -162,6 +163,27 @@ pub fn with_injected(&self, target_key: &str, payload: &str) -> String;
 **Corps**
 
 **Déroulé.** On reconstruit la query paire par paire à partir de la liste `params` — jamais de la chaîne d'origine. Pour chaque `Param`, la valeur émise est le `payload` si sa clé est celle qu'on injecte, et sa valeur d'origine sinon ; on formate `clé=valeur`. On joint toutes ces paires par `&`, puis on recolle la base et cette query pour rendre l'URL complète.
+
+### 5.3 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** prolonger le lancement de fumée de la phase 1 — après `cli::parse`, passer `cfg.url` à `url::parse` et afficher (temporairement) les `Param` découverts, pour vérifier le découpage à l'œil.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| affichage encore **temporaire** | dès la phase 4, c'est `scanner::run` qui appellera `url::parse` ; `main` cessera de le faire |
+| `main` reste mince | il n'orchestre pas, il vérifie une brique à la fois |
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** On récupère la `Config` comme en phase 1, on passe `cfg.url` à `url::parse`, et on affiche la liste des `Param` du `Target` obtenu. Ce print est un **échafaudage** : à la phase 4, l'appel à `url::parse` migrera dans `scanner::run`, et `main` ne l'appellera plus directement.
 
 ---
 

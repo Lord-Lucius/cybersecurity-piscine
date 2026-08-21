@@ -101,6 +101,7 @@ Le sujet le dit explicitement : l'extraction des données n'est **pas garantie**
 1. **`row_expression`** — pure : colonnes + moteur → l'expression SQL de concaténation. Testable.
 2. **`split_rows`** — pure : la chaîne aplatie → `Vec<Vec<String>>`. Testable.
 3. **`dump`** — orchestration : expression → `run_union` → `split_rows`.
+4. **Câblage** — `main` inchangé : le dump s'ajoute dans `run`.
 
 > Les deux briques pures (`row_expression`, `split_rows`) s'écrivent et se testent **sans réseau** ; `dump` ne fait que les coudre autour de `run_union` (phase 6).
 
@@ -223,6 +224,26 @@ pub fn dump(client: &Client, cfg: &Config, target: &Target, key: &str,
 **Corps**
 
 **Déroulé.** On bâtit l'expression de ligne avec `row_expression` pour le moteur et les colonnes données (→ § 5.1). On la passe à `run_union` (→ phase 6) : si le résultat est *absent*, on journalise et on rend un tableau **vide** — best effort, pas d'erreur. Sinon, on le redécoupe avec `split_rows` (→ § 5.2), on journalise le nombre de lignes (log ①), et on rend le `Vec<Vec<String>>`.
+
+### 5.4 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** encore rien de neuf côté `main`. Le dump (`dump` sur les tables intéressantes) s'ajoute **dans** `scanner::run`, après l'extraction du schéma, et complète le résultat que `main` affiche.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| `dump` appelé depuis `run`, pas depuis `main` | l'orchestration reste centralisée ; `main` reste mince |
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** `main` ne bouge pas : lire la `Config`, appeler `scanner::run`, afficher le résultat. Le dump des tables se branche **dans** `run`, à la suite du schéma, et garnit le résultat rendu. Le câblage de `main` prendra sa forme **définitive** à la phase 8, quand ce résultat deviendra un `Report` à afficher et à archiver.
 
 ---
 

@@ -117,6 +117,7 @@ Le `trait Extractor` de [`rust/02`](../rust/02-structurer-le-code.md) § 4 est t
 2. **`engine_from_signature`** — un corps d'erreur → `Option<SqlEngine>`, pur, testable.
 3. **`probe`** — une sonde → `bool`, via `similar`.
 4. **`fingerprint`** — voie 1 (signature) puis voie 2 (sondes croisées).
+5. **Câblage** — `main` inchangé : `run` intègre le moteur au résultat.
 
 > `engine_from_signature` est le seul morceau sans réseau : on l'écrit et on le teste en premier, comme `similar` en phase 4.
 
@@ -253,6 +254,26 @@ pub fn fingerprint(client: &Client, cfg: &Config, target: &Target,
 **Déroulé.** *Voie 1, gratuite.* On provoque une erreur en injectant la valeur d'origine suivie d'un `'`, on envoie (→ phase 3), et on passe le corps obtenu à `engine_from_signature` (→ § 5.1). S'il rend un moteur, on journalise (log ①) et on le rend aussitôt.
 
 *Voie 2, les sondes.* Sinon, on lance deux sondes croisées via `probe` (→ § 5.2) : l'une pour SQLite (l'expression ` sqlite_version() > '0'`), l'autre pour MySQL (` VERSION() LIKE '%'`), chacune rendant un booléen. On journalise (log ①). On **croise** alors les deux résultats : la vraie seule côté SQLite donne `Sqlite`, la vraie seule côté MySQL donne `MySql`, et les deux autres cas — les deux vraies, ou les deux fausses — tombent sur `Unknown`, car on ne devine pas un moteur non confirmé.
+
+### 5.4 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** rien de neuf côté `main` — il appelle toujours `scanner::run` et affiche le résultat. C'est `run` qui, après un verdict vulnérable, appelle `engine::fingerprint` et intègre le moteur au résultat rendu.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| ne **pas** câbler `fingerprint` depuis `main` | l'orchestration reste dans `run` ; `main` ignore les étapes internes du scan |
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** `main` ne change pas : il lit la `Config`, appelle `scanner::run`, et affiche le résultat. Le fingerprint se branche **dans** `run`, juste après la détection réussie ; `main` ne voit que le résultat enrichi du moteur. C'est l'intérêt d'avoir concentré l'orchestration dans `run` (phase 4) : on ajoute une étape sans toucher au lanceur.
 
 ---
 

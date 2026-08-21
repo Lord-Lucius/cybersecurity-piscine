@@ -168,6 +168,41 @@ pub fn print_help();
 
 **Déroulé.** Écrire la ligne d'usage (`./vaccine [-X METHOD] [-o FILE] URL`), puis une ligne par option — `-X`, `-o`, `-h` — avec sa description. Du texte littéral, aucune logique.
 
+### 5.3 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** remplacer le comptage d'arguments du squelette actuel de `main.rs` par un vrai lancement — collecter `argv`, appeler `cli::parse`, et traduire son `Result` en comportement CLI : l'aide ou une erreur d'usage sur `stderr`, sinon (temporairement) l'affichage de la `Config` obtenue.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| garder `main` **mince**, toute la logique dans la lib | testable, et `main.rs` ne sera plus retouché en profondeur ensuite |
+| erreur d'usage → `stderr` + code de sortie **non nul** | un outil CLI signale l'échec par son code de retour, pas seulement par un message |
+| `-h` → aide puis code **0** | l'aide n'est pas une erreur |
+
+**⚠️ Pièges**
+
+⚠️ Afficher l'usage ou l'aide sur `stdout` : un `> fichier` capturerait l'aide au lieu du futur rapport. Aide et erreurs vont sur `stderr`.
+
+**🧭 Quoi utiliser, et pourquoi**
+
+| Ce que fait l'algorithme | Où trouver comment |
+|---|---|
+| collecter les arguments | `std::env::args().collect::<Vec<String>>()` |
+| traduire le `Result` en code de sortie | `match` sur le retour de `parse`, ou `fn main() -> Result<(), VaccineError>` |
+
+*Troisième temps :* `main` ne contient **aucune** logique de parsing — elle est entière dans `cli::parse`. Son seul rôle est d'aiguiller : collecter, appeler, traduire l'issue en code de sortie. C'est ce qui permet de tester `parse` sans lancer de process (§ 5.1) et de ne plus toucher `main.rs` ensuite.
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** On collecte les arguments du programme en `Vec<String>` et on les passe à `cli::parse`. Sur `Ok(cfg)`, on affiche pour l'instant la `Config` — vérification à l'œil, remplacée dès la phase 3. Sur une erreur d'usage, on écrit le message sur `stderr` et on sort avec un code non nul ; le cas « aide demandée » écrit l'aide via `print_help` et sort avec le code 0. Toute la suite du programme se branchera **ici**, au fil des phases, `main` restant un simple aiguillage.
+
 ---
 
 ## 6. Pièges spécifiques à cette phase

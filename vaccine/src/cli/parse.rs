@@ -6,7 +6,7 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:05:47 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/14 18:06:04 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/21 13:38:22 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,4 +64,23 @@ pub fn parse(args: Vec<String>) -> Result<Config, VaccineError> {
     Ok(Config { url, method, output })
 }
 
-pub fn print_help()
+pub fn print_help() {
+    println!(
+        "\
+        Usage:
+            vaccine [OPTIONS] <URL>
+
+        Arguments:
+            <URL>    URL cible
+
+        Options:
+            -X <METHOD>    Méthode HTTP à utiliser
+            -o <FILE>      Écrire la réponse dans un fichier
+            -h, --help     Afficher cette aide
+
+        Examples:
+            vaccine -X POST -o res.txt http://h/?id=1
+            vaccine -X GET http://example.com
+        "
+    );
+}

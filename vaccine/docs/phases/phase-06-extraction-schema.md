@@ -114,6 +114,7 @@ Chaque niveau (databases, tables, columns) a une syntaxe **différente par moteu
 3. **`extract_between`** — pur : isoler le texte entre deux marqueurs. Testable.
 4. **`run_union`** — bâtir le payload UNION (expr marquée dans la colonne affichée), envoyer, rendre le corps.
 5. **`databases` / `tables` / `columns`** — fournir l'expression de métadonnées du moteur, découper le résultat.
+6. **Câblage** — `main` inchangé : le schéma s'ajoute dans `run`.
 
 > `count` puis `display` sont **ordonnés** : le second a besoin du premier. `extract_between` est la seule brique hors réseau — on l'écrit et on la teste en premier.
 
@@ -335,6 +336,26 @@ pub fn columns(client: &Client, cfg: &Config, target: &Target,
 **Corps**
 
 **Déroulé (les trois, même forme).** On choisit, selon `union.engine`, l'expression de métadonnées du niveau voulu (les chaînes du § 5.0) ; pour `columns`, on y interpole le nom de `table`. On passe cette expression à `run_union` (→ § 5.4), qui rend la chaîne concaténée affichée. Si elle est *absente*, on rend une liste vide (rien d'extractible). Sinon on la découpe sur `\n`, on nettoie les entrées vides, et on rend le `Vec<String>`. Cas particuliers : `databases` sur SQLite rend directement une liste vide ; `columns` sur SQLite reçoit un DDL `CREATE TABLE …` et en extrait les noms de colonnes par découpage de chaîne plutôt que par un simple `split('\n')`.
+
+### 5.6 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** toujours rien de neuf côté `main`. L'extraction du schéma (calcul du contexte `Union`, puis `databases`/`tables`/`columns`) s'ajoute **dans** `scanner::run`, après le fingerprint, et vient garnir le résultat que `main` affiche.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| l'extraction vit dans `run`, pas dans `main` | `main` reste un aiguillage ; le résultat s'enrichit sans le toucher |
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** `main` conserve sa forme de la phase 4 : lire la `Config`, appeler `scanner::run`, afficher le résultat. Le préambule `Union` et les listes de schéma sont produits **dans** `run` (juste après le moteur) et rejoignent le résultat rendu. Le lanceur n'en sait rien.
 
 ---
 

@@ -6,12 +6,13 @@
 /*   By: luluzuri <luluzuri@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 12:20:12 by luluzuri          #+#    #+#             */
-/*   Updated: 2026/08/12 16:18:28 by luluzuri         ###   ########.fr       */
+/*   Updated: 2026/08/21 16:16:56 by luluzuri         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 use std::env;
 use std::process;
+use vaccine::cli::parse;
 
 fn error(msg: String, code: i32) {
     eprintln!("[ERROR] {msg}", msg=msg);

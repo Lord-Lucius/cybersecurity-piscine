@@ -170,6 +170,27 @@ pub fn new() -> Client;
 
 **Déroulé.** Construire un agent `ureq` configuré avec un timeout de 10 s, et le ranger dans le `Client` rendu. C'est cet agent réutilisé qui évite de rétablir connexion et timeout à chaque requête (il y en aura des centaines).
 
+### 5.3 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** un `main` de fumée **réseau** — construire un `Client`, envoyer une requête à l'URL de la `Config`, et afficher le statut et la taille du corps. Il prouve la brique HTTP avant que la détection ne s'en serve.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| `Client` construit ici, **temporairement** | valide `send` ; à la phase 4 c'est `scanner::run` qui construira le `Client` |
+| afficher statut + taille, pas le corps entier | vérification rapide sans noyer le terminal |
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** On lit la `Config`, on construit un `Client` (→ § 5.2), on envoie une requête vers `cfg.url`, et on affiche le statut et la longueur du corps de la `Response`. Comme aux phases précédentes, c'est un **échafaudage** : la construction du `Client` et l'envoi migreront dans `scanner::run` à la phase 4, où `main` cessera de parler HTTP directement.
+
 ---
 
 ## 6. Pièges spécifiques à cette phase

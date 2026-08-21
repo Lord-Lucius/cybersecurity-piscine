@@ -124,6 +124,7 @@ Le résultat d'un test n'est pas un `bool` : c'est « sûr » **ou** « vulnéra
 2. **`error_based`** — un payload, une recherche de signature.
 3. **`boolean_based`** — deux payloads, trois comparaisons.
 4. **`scanner::run`** — orchestration params × techniques, baseline en tête.
+5. **Câblage** — `main` appelle `scanner::run` et affiche le verdict.
 
 ---
 
@@ -274,6 +275,37 @@ pub fn run(cfg: &Config) -> Result<Option<Verdict>, VaccineError>;
 **Corps**
 
 **Déroulé.** On construit le `Client` (→ phase 3), on parse l'URL de la `Config` en `Target` (→ phase 2), et on calcule **une fois** la baseline en envoyant la requête non injectée (→ phase 3). Si le `Target` n'a aucun paramètre, il n'y a rien à injecter : on rend *absent*. Sinon, pour chaque paramètre, on tente d'abord `error_based` (→ § 5.2) ; si le verdict est *vulnérable*, on le rend aussitôt. Sinon on tente `boolean_based` (→ § 5.3) en lui passant la baseline ; s'il conclut *vulnérable*, on le rend. Si aucun paramètre n'est vulnérable après les deux techniques, on rend *absent*.
+
+### 5.5 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** faire basculer `main` de l'échafaudage vers l'**orchestration réelle** — appeler `scanner::run` et afficher le verdict : paramètre vulnérable, technique, payload, ou « aucune injection ». C'est le premier `main` vraiment utile.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| `main` délègue **tout** à `scanner::run` | `main` reste mince ; la boucle params × techniques vit dans `run` |
+| les échafaudages des phases 2-3 disparaissent | `url::parse` et le `Client` vivent désormais **dans** `run` |
+| erreur de `run` → `stderr` + code non nul | cohérence CLI |
+
+**🧭 Quoi utiliser, et pourquoi**
+
+| Ce que fait l'algorithme | Où trouver comment |
+|---|---|
+| lancer le scan | `scanner::run(&cfg)?` → § 5.4 |
+| présenter le verdict | `match` sur l'`Option<Verdict>` rendue |
+
+*Troisième temps :* à partir d'ici, `main` ne connaît plus ni URL ni HTTP — il ne voit que `run` et son résultat. Concentrer l'orchestration dans `run` (et non dans `main`) est ce qui permettra aux phases 5-8 d'enrichir le scan **sans jamais retoucher `main`**, jusqu'au câblage final de la phase 8.
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+**Corps**
+
+**Déroulé.** On lit la `Config`, on appelle `scanner::run` (→ § 5.4) qui rend le verdict. Sur un paramètre vulnérable, `main` affiche son nom, la technique et le payload ; sur « rien », il affiche « aucune injection trouvée ». Une erreur remontée par `run` est écrite sur `stderr` avec un code de sortie non nul. Les prints de fumée des phases 2-3 sont retirés : `url::parse` et le `Client` sont maintenant internes à `run`.
 
 ---
 

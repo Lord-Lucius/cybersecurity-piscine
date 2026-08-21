@@ -206,6 +206,44 @@ pub fn save(report: &Report, path: &str) -> Result<(), VaccineError>;
 
 **Déroulé.** On obtient le texte via `render` (→ § 5.2). On ouvre le fichier `path` en mode création + ajout ; toute erreur d'ouverture est convertie en `VaccineError::Io` et remontée par `?`. On écrit le texte suivi d'un saut de ligne et d'un séparateur de scan (même conversion d'erreur à l'écriture). On journalise (log ①) et on rend `Ok`.
 
+### 5.4 · Câblage dans `main`
+
+**Ce qu'il doit accomplir :** donner à `main` sa forme **définitive** — récupérer le `Report` produit par le scan, l'afficher sur `stdout` via `render`, et, si `-o` est fourni, l'archiver via `save`. C'est le point d'intégration final du projet.
+
+**Décisions**
+
+| Décision | Pourquoi |
+|---|---|
+| affichage `stdout` **toujours**, `save` **seulement si** `-o` | un scan sans `-o` doit quand même montrer son résultat |
+| `render` pour l'écran, `save` réutilise `render` | fichier == écran, une seule mise en forme |
+| erreur de `save` → `stderr` + code non nul | l'échec d'archivage est un échec de commande |
+
+**⚠️ Pièges**
+
+⚠️ Conditionner l'affichage à `-o` : sans `-o`, plus rien ne s'afficherait. `stdout` **toujours** ; `save` **en plus** quand `-o` est là.
+
+**🧭 Quoi utiliser, et pourquoi**
+
+| Ce que fait l'algorithme | Où trouver comment |
+|---|---|
+| obtenir le `Report` | `scanner::run(&cfg)?` (rend le `Report` accumulé) |
+| afficher | `println!("{}", render(&report))` → § 5.2 |
+| archiver si demandé | `if let Some(path) = &cfg.output { save(&report, path)? }` → § 5.3 |
+
+*Troisième temps :* `main` reste mince même à sa forme finale : il ne **formate** rien (c'est `render`) et n'**écrit** rien lui-même (c'est `save`). Il ne décide que *quand* appeler chacun — écran toujours, fichier sur `-o`. C'est l'aboutissement du choix de la phase 4 : toute l'orchestration dans `run`, tout le rendu dans `report`, `main` n'étant que l'aiguillage entre les deux.
+
+**Prototype**
+
+```rust
+fn main();
+```
+
+> Variante idiomatique : `fn main() -> Result<(), VaccineError>` laisse le `?` remonter l'erreur et fixer le code de sortie sans `match` explicite.
+
+**Corps**
+
+**Déroulé.** On lit la `Config`, on appelle `scanner::run` qui rend le `Report` complet du scan. On l'affiche **toujours** sur `stdout` via `render` (→ § 5.2). Si `cfg.output` porte un chemin, on appelle `save` (→ § 5.3) pour l'archiver, en traduisant une éventuelle erreur d'I/O en code de sortie non nul. C'est le `main` **définitif** : les phases suivantes n'y touchent plus.
+
 ---
 
 ## 6. Pièges spécifiques à cette phase
